@@ -202,12 +202,11 @@ export default function GoogleStyleSubscriptionPage() {
     setRenewModal(prev => ({ ...prev, voucherLoading: true }))
 
     const basePrice = renewModal.planCycle === 'yearly' ? 400000 : 40000
-    const pricing = calculateSubscriptionPrice(basePrice)
     try {
       const res = await api.post('/payment/validate-voucher', {
         code: renewModal.voucherCode.trim().toUpperCase(),
         planType: `plus-${renewModal.planCycle}`,
-        baseAmount: pricing.subtotalWithTax
+        baseAmount: basePrice
       })
       setRenewModal(prev => ({
         ...prev,
@@ -233,7 +232,8 @@ export default function GoogleStyleSubscriptionPage() {
     try {
       const res = await api.post('/payment/checkout', {
         planType: `plus-${renewModal.planCycle}`,
-        amount: pricing.subtotalWithTax,
+        baseAmount: basePrice,
+        amount: pricing.netSubtotal,
         userId: user.id,
         voucherCode: renewModal.appliedVoucher?.voucher?.code || undefined
       })
@@ -579,6 +579,25 @@ export default function GoogleStyleSubscriptionPage() {
                       </span>
                     </div>
 
+                    {renewModal.appliedVoucher && (
+                      <div className="flex items-center justify-between text-xs text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
+                        <span className="flex items-center gap-1.5">
+                          <Ticket className="w-3.5 h-3.5" />
+                          Diskon Voucher ({renewModal.appliedVoucher.voucher.code})
+                        </span>
+                        <span>- Rp {currentPricing.discountAmount.toLocaleString('id-ID')}</span>
+                      </div>
+                    )}
+
+                    {renewModal.appliedVoucher && currentPricing.discountAmount > 0 && (
+                      <div className="flex items-center justify-between text-xs text-slate-600">
+                        <span>Harga Paket Setelah Diskon</span>
+                        <span className="font-semibold text-slate-900">
+                          Rp {currentPricing.discountedBasePrice.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+                    )}
+
                     <div className="flex items-center justify-between text-xs text-slate-600">
                       <span>PPN (11%)</span>
                       <span className="font-medium text-slate-900">
@@ -589,7 +608,7 @@ export default function GoogleStyleSubscriptionPage() {
                     <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-200/60 pt-1.5">
                       <span>Subtotal</span>
                       <span className="font-semibold text-slate-800">
-                        Rp {currentPricing.subtotalWithTax.toLocaleString('id-ID')}
+                        Rp {currentPricing.netSubtotal.toLocaleString('id-ID')}
                       </span>
                     </div>
 
@@ -604,16 +623,6 @@ export default function GoogleStyleSubscriptionPage() {
                         Rp {currentPricing.paymentFee.toLocaleString('id-ID')}
                       </span>
                     </div>
-
-                    {renewModal.appliedVoucher && (
-                      <div className="flex items-center justify-between text-xs text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
-                        <span className="flex items-center gap-1.5">
-                          <Ticket className="w-3.5 h-3.5" />
-                          Diskon Voucher ({renewModal.appliedVoucher.voucher.code})
-                        </span>
-                        <span>- Rp {Number(renewModal.appliedVoucher.discountAmount).toLocaleString('id-ID')}</span>
-                      </div>
-                    )}
 
                     <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
                       <span className="text-xs font-bold text-slate-900">Total Pembayaran</span>

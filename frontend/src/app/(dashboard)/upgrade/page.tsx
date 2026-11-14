@@ -64,7 +64,7 @@ export default function UpgradePage() {
       const res = await api.post('/payment/validate-voucher', {
         code: voucherCodeInput.trim(),
         planType: `${selectedPlan}-${billingCycle}`,
-        baseAmount: pricing.subtotalWithTax
+        baseAmount: baseAmount
       })
 
       setAppliedVoucher(res.data)
@@ -89,7 +89,8 @@ export default function UpgradePage() {
     try {
       const res = await api.post('/payment/checkout', {
         planType: `${selectedPlan}-${billingCycle}`,
-        amount: pricing.subtotalWithTax,
+        baseAmount: baseAmount,
+        amount: pricing.netSubtotal,
         userId: userId,
         voucherCode: appliedVoucher?.voucher?.code || undefined
       })
@@ -345,6 +346,28 @@ export default function UpgradePage() {
                     Rp {Number(pricing.basePrice).toLocaleString('id-ID')}
                   </span>
                 </div>
+
+                {appliedVoucher && (
+                  <div className="flex justify-between items-center text-emerald-600 font-medium bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">
+                    <span className="flex items-center gap-1.5 text-xs">
+                      <Tag className="w-3.5 h-3.5" />
+                      Diskon Voucher ({appliedVoucher.voucher.code})
+                    </span>
+                    <span className="font-bold text-sm">
+                      - Rp {Number(pricing.discountAmount).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                )}
+
+                {appliedVoucher && pricing.discountAmount > 0 && (
+                  <div className="flex justify-between text-slate-600 text-xs">
+                    <span>Harga Paket Setelah Diskon</span>
+                    <span className="font-semibold text-slate-900">
+                      Rp {Number(pricing.discountedBasePrice).toLocaleString('id-ID')}
+                    </span>
+                  </div>
+                )}
+
                 <div className="flex justify-between text-slate-600">
                   <span>PPN (11%)</span>
                   <span className="font-medium text-slate-900">
@@ -354,7 +377,7 @@ export default function UpgradePage() {
                 
                 <div className="flex justify-between text-slate-500 border-t border-slate-100 pt-2 text-xs">
                   <span>Subtotal</span>
-                  <span className="font-semibold text-slate-800">Rp {Number(pricing.subtotalWithTax).toLocaleString('id-ID')}</span>
+                  <span className="font-semibold text-slate-800">Rp {Number(pricing.netSubtotal).toLocaleString('id-ID')}</span>
                 </div>
 
                 <div className="flex justify-between items-center text-slate-600">
@@ -369,18 +392,6 @@ export default function UpgradePage() {
                   </span>
                 </div>
 
-                {appliedVoucher && (
-                  <div className="flex justify-between items-center text-emerald-600 font-medium bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">
-                    <span className="flex items-center gap-1.5 text-xs">
-                      <Tag className="w-3.5 h-3.5" />
-                      Diskon Voucher ({appliedVoucher.voucher.code})
-                    </span>
-                    <span className="font-bold text-sm">
-                      - Rp {Number(pricing.discountAmount).toLocaleString('id-ID')}
-                    </span>
-                  </div>
-                )}
-
                 <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
                   <span className="font-bold text-slate-900">Total Pembayaran</span>
                   {pricing.isFree ? (
@@ -392,11 +403,6 @@ export default function UpgradePage() {
                     </div>
                   ) : (
                     <div className="text-right">
-                      {appliedVoucher && (
-                        <span className="text-xs text-slate-400 line-through mr-2">
-                          Rp {Number(pricing.subtotalWithTax + pricing.paymentFee).toLocaleString('id-ID')}
-                        </span>
-                      )}
                       <span className="text-xl font-bold text-[#0087FF]">
                         Rp {Number(pricing.totalPayable).toLocaleString('id-ID')}
                       </span>

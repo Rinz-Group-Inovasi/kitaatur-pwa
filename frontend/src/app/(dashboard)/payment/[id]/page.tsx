@@ -109,16 +109,17 @@ export default function PaymentPage() {
               const isTrial = sub.plan_type?.includes('trial')
               const totalAmount = Number(sub.amount_paid || 0)
               const origAmount = Number(sub.original_amount || 0)
-              const discountAmt = Number(sub.discount_amount || 0)
 
-              // Hitung rincian Harga Dasar, PPN 11%, dan Biaya Layanan Pembayaran KitaPay
+              // Hitung rincian Harga Dasar, Diskon Voucher, PPN 11%, dan Biaya Layanan Pembayaran KitaPay
               const isYearly = (sub.plan_type || '').toLowerCase().includes('yearly')
               const basePrice = origAmount > 0 
                 ? Math.round(origAmount / 1.11) 
                 : (isYearly ? 400000 : 40000)
+              const discountAmt = Math.min(Number(sub.discount_amount || 0), basePrice)
+              const discountedBasePrice = Math.max(0, basePrice - discountAmt)
               const ppn = origAmount > 0 ? (origAmount - basePrice) : Math.round(basePrice * 0.11)
-              const subtotal = basePrice + ppn
-              const fee = totalAmount > 0 ? Math.max(0, totalAmount - (subtotal - discountAmt)) : 0
+              const netSubtotal = discountedBasePrice + ppn
+              const fee = totalAmount > 0 ? Math.max(0, totalAmount - netSubtotal) : 0
 
               return (
                 <div className="space-y-3 mb-8">
@@ -138,10 +139,38 @@ export default function PaymentPage() {
                         </span>
                       </div>
 
+                      {sub.voucher_code && discountAmt > 0 && (
+                        <div className="flex justify-between text-sm text-emerald-600 font-medium bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
+                          <span className="flex items-center gap-1.5">
+                            <Tag className="w-3.5 h-3.5" />
+                            Diskon Voucher ({sub.voucher_code})
+                          </span>
+                          <span className="font-bold">
+                            - Rp {discountAmt.toLocaleString('id-ID')}
+                          </span>
+                        </div>
+                      )}
+
+                      {sub.voucher_code && discountAmt > 0 && (
+                        <div className="flex justify-between text-sm text-slate-600">
+                          <span>Harga Paket Setelah Diskon</span>
+                          <span className="font-semibold text-slate-900">
+                            Rp {discountedBasePrice.toLocaleString('id-ID')}
+                          </span>
+                        </div>
+                      )}
+
                       <div className="flex justify-between text-sm text-slate-600">
                         <span>PPN (11%)</span>
                         <span className="font-medium text-slate-900">
                           Rp {ppn.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-sm text-slate-500 border-t border-slate-100 pt-1.5">
+                        <span>Subtotal</span>
+                        <span className="font-semibold text-slate-800">
+                          Rp {netSubtotal.toLocaleString('id-ID')}
                         </span>
                       </div>
 
@@ -159,18 +188,6 @@ export default function PaymentPage() {
                         </div>
                       )}
                     </>
-                  )}
-
-                  {sub.voucher_code && discountAmt > 0 && (
-                    <div className="flex justify-between text-sm text-emerald-600 font-medium bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
-                      <span className="flex items-center gap-1.5">
-                        <Tag className="w-3.5 h-3.5" />
-                        Voucher ({sub.voucher_code})
-                      </span>
-                      <span className="font-bold">
-                        - Rp {discountAmt.toLocaleString('id-ID')}
-                      </span>
-                    </div>
                   )}
 
                   <div className="flex justify-between text-sm border-t border-slate-100 pt-3 items-center">
