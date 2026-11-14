@@ -230,6 +230,9 @@ export async function middleware(request: NextRequest) {
     if (pathname === '/admin/organizations') {
       return redirectWithCookies(new URL('/organizations', request.url), supabaseResponse)
     }
+    if (pathname === '/admin/expirations') {
+      return redirectWithCookies(new URL('/expirations', request.url), supabaseResponse)
+    }
     if (pathname === '/admin/announcements') {
       return redirectWithCookies(new URL('/announcements', request.url), supabaseResponse)
     }
@@ -247,6 +250,10 @@ export async function middleware(request: NextRequest) {
       return rewriteWithCookies(url, request, supabaseResponse)
     }
     if (pathname === '/organizations' || pathname.startsWith('/organizations/')) {
+      url.pathname = `/admin${pathname}`
+      return rewriteWithCookies(url, request, supabaseResponse)
+    }
+    if (pathname === '/expirations' || pathname.startsWith('/expirations/')) {
       url.pathname = `/admin${pathname}`
       return rewriteWithCookies(url, request, supabaseResponse)
     }

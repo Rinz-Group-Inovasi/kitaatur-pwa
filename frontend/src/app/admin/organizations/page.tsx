@@ -3,12 +3,12 @@ import toast from 'react-hot-toast'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import Link from 'next/link'
-import { Search, Building2, Crown, Trash2, ShieldCheck, ArrowRight, X, GraduationCap, Link2, Unlink, CheckSquare, Square, Loader2, Sparkles, Plus } from 'lucide-react'
+import { Search, Building2, Crown, Trash2, ShieldCheck, ArrowRight, X, GraduationCap, Link2, Unlink, CheckSquare, Square, Loader2, Sparkles, Plus, Clock } from 'lucide-react'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useAdminRoute } from '../useAdminRoute'
 
 export default function AdminOrgsPage() {
-  const { dashboardHref } = useAdminRoute()
+  const { dashboardHref, expirationsHref } = useAdminRoute()
   const [orgs, setOrgs] = useState<any[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -236,13 +236,23 @@ export default function AdminOrgsPage() {
           <p className="text-slate-500 mt-1 text-sm">Buat sekolah induk, tautkan ekskul, atau impersonate.</p>
         </div>
 
-        <button
-          onClick={() => setCreateSchoolModal({ isOpen: true, name: '', slug: '', ownerEmail: '', submitting: false })}
-          className="px-4 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm shadow-purple-600/30 transition-all shrink-0"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Buat Organisasi Sekolah</span>
-        </button>
+        <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
+          <Link
+            href={expirationsHref}
+            className="px-4 py-2.5 rounded-2xl bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm shadow-amber-500/20 transition-all shrink-0"
+          >
+            <Clock className="w-4 h-4" />
+            <span>Masa Kadaluwarsa</span>
+          </Link>
+
+          <button
+            onClick={() => setCreateSchoolModal({ isOpen: true, name: '', slug: '', ownerEmail: '', submitting: false })}
+            className="px-4 py-2.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 shadow-sm shadow-purple-600/30 transition-all shrink-0"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Buat Organisasi Sekolah</span>
+          </button>
+        </div>
       </div>
 
       {/* Filter Tabs */}
@@ -311,6 +321,9 @@ export default function AdminOrgsPage() {
           {filtered.map(org => {
             const isSchool = org.is_edu || ((org._count?.school_links_as_school || 0) > 0)
             const linkedCount = org._count?.school_links_as_school || 0
+            const latestSub = org.owner?.subscriptions?.[0]
+            const isSubExpired = latestSub?.expires_at ? new Date(latestSub.expires_at) < new Date() : false
+            const subDaysLeft = latestSub?.expires_at ? Math.ceil((new Date(latestSub.expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null
 
             return (
               <div 
@@ -345,6 +358,28 @@ export default function AdminOrgsPage() {
                       {isSchool && linkedCount > 0 && (
                         <span className="bg-purple-100/70 text-purple-800 font-bold px-2 py-0.5 rounded-full text-[11px]">
                           {linkedCount} Ekskul Ditautkan
+                        </span>
+                      )}
+                      {latestSub ? (
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold ${
+                          isSubExpired
+                            ? 'bg-rose-50 text-rose-700 border border-rose-200'
+                            : (subDaysLeft !== null && subDaysLeft <= 7)
+                            ? 'bg-amber-50 text-amber-800 border border-amber-300'
+                            : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                        }`}>
+                          <Clock className="w-3 h-3" />
+                          <span>
+                            {isSubExpired 
+                              ? 'Kadaluwarsa' 
+                              : (subDaysLeft !== null && subDaysLeft <= 7) 
+                              ? `Sisa ${subDaysLeft} Hari` 
+                              : `s/d ${new Date(latestSub.expires_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}`}
+                          </span>
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400 bg-slate-100 px-2 py-0.5 rounded font-medium">
+                          Personal (Gratis)
                         </span>
                       )}
                     </div>

@@ -13,7 +13,8 @@ import {
   ShieldCheck, 
   Loader2,
   Lock,
-  Ticket
+  Ticket,
+  Clock
 } from 'lucide-react'
 import { supabase } from '@/lib/api'
 import { useAdminRoute, isSuperadminEmail } from './useAdminRoute'
@@ -22,7 +23,7 @@ import toast from 'react-hot-toast'
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname() || ''
-  const { dashboardHref, orgsHref, announcementsHref, vouchersHref, loginHref, mainAppUrl } = useAdminRoute()
+  const { dashboardHref, orgsHref, expirationsHref, announcementsHref, vouchersHref, loginHref, mainAppUrl } = useAdminRoute()
 
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<any>(null)
@@ -137,6 +138,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   // Active link check
   const isDashboardActive = pathname === '/' || pathname === '/admin'
   const isOrgsActive = pathname.includes('/organizations')
+  const isExpirationsActive = pathname.includes('/expirations')
   const isAnnouncementsActive = pathname.includes('/announcements')
   const isVouchersActive = pathname.includes('/vouchers')
 
@@ -182,6 +184,17 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               >
                 <Building2 className="w-4 h-4" />
                 <span>Organisasi & Sekolah</span>
+              </Link>
+              <Link
+                href={expirationsHref}
+                className={`px-3 py-1.5 rounded-lg text-sm font-semibold transition flex items-center gap-2 ${
+                  isExpirationsActive
+                    ? 'bg-[#E0F4FE] text-[#007AE6]'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+                }`}
+              >
+                <Clock className="w-4 h-4" />
+                <span>Kadaluwarsa Organisasi</span>
               </Link>
               <Link
                 href={announcementsHref}
@@ -271,6 +284,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             >
               <Building2 className="w-4 h-4" />
               <span>Organisasi & Sekolah</span>
+            </Link>
+            <Link
+              href={expirationsHref}
+              onClick={() => setMobileMenuOpen(false)}
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-semibold ${
+                isExpirationsActive ? 'bg-[#E0F4FE] text-[#007AE6]' : 'text-slate-600 hover:bg-slate-50'
+              }`}
+            >
+              <Clock className="w-4 h-4" />
+              <span>Kadaluwarsa Organisasi</span>
             </Link>
             <Link
               href={announcementsHref}

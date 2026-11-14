@@ -3,6 +3,8 @@ import { requireAuth } from '../middleware/auth.middleware'
 import {
   getSystemStats,
   getAllOrgs,
+  getOrgExpirationsAdmin,
+  setOrgExpirationAdmin,
   grantSubscription,
   getSystemSettings,
   updateSystemSetting,
@@ -49,14 +51,16 @@ router.get('/app-info', getPublicAppInfo)
 router.use(requireAuth)
 router.use(requireDev)
 
-// Stats & Orgs
+// Stats & Orgs & Expirations
 router.get('/stats', getSystemStats)
 router.get('/orgs', getAllOrgs)
+router.get('/expirations', getOrgExpirationsAdmin)
 router.post('/orgs/create-school', createSchoolOrgAdmin)
 router.delete('/orgs/:id', forceDeleteOrg)
 
 // Subs
 router.post('/subscriptions/grant', grantSubscription)
+router.post('/subscriptions/set-expiration', setOrgExpirationAdmin)
 
 // Settings (Maintenance mode etc)
 router.get('/settings', getSystemSettings)

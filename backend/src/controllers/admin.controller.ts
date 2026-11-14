@@ -27,12 +27,19 @@ export async function getSystemStats(req: Request, res: Response) {
   }
 }
 
-// 2. Get All Organizations (with their owners)
+// 2. Get All Organizations (with their owners and latest subscription)
 export async function getAllOrgs(req: Request, res: Response) {
   try {
     const orgs = await prisma.organizations.findMany({
       include: {
-        owner: true,
+        owner: {
+          include: {
+            subscriptions: {
+              orderBy: { created_at: 'desc' },
+              take: 1
+            }
+          }
+        },
         _count: {
           select: {
             organization_members: true,
@@ -136,6 +143,194 @@ export async function grantSubscription(req: Request, res: Response) {
   } catch (err) {
     console.error('Error granting sub:', err)
     return res.status(500).json({ error: 'Internal Server Error' })
+  }
+}
+
+// 3b. Get All Organizations Expiration & Subscription Details
+export async function getOrgExpirationsAdmin(req: Request, res: Response) {
+  try {
+    const orgs = await prisma.organizations.findMany({
+      include: {
+        owner: {
+          include: {
+            subscriptions: {
+              orderBy: { created_at: 'desc' }
+            }
+          }
+        },
+        _count: {
+          select: {
+            organization_members: true,
+            school_links_as_school: true
+          }
+        }
+      },
+      orderBy: { created_at: 'desc' }
+    })
+
+    const now = new Date()
+
+    const results = orgs.map((org) => {
+      const isSchool = org.is_edu || ((org._count?.school_links_as_school || 0) > 0)
+      const owner = org.owner
+
+      // Prefer active subscription, or fallback to the latest created
+      const allSubs = owner?.subscriptions || []
+      const activeSub = allSubs.find((s) => s.status === 'active') || allSubs[0] || null
+
+      let status = 'free'
+      let planType = 'free'
+      let startsAt: Date | null = null
+      let expiresAt: Date | null = null
+      let daysLeft: number | null = null
+      let hoursLeft: number | null = null
+      let isExpired = false
+      let subscriptionId: string | null = null
+
+      if (!owner) {
+        status = 'no_owner'
+        planType = isSchool ? 'school_admin' : 'free'
+      } else if (activeSub) {
+        subscriptionId = activeSub.id
+        planType = activeSub.plan_type || 'plus'
+        startsAt = activeSub.starts_at
+        expiresAt = activeSub.expires_at
+
+        const expDate = new Date(activeSub.expires_at)
+        const diffMs = expDate.getTime() - now.getTime()
+        daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+        hoursLeft = Math.ceil(diffMs / (1000 * 60 * 60))
+
+        if (activeSub.status !== 'active' || diffMs < 0) {
+          isExpired = true
+          status = 'expired'
+        } else if (daysLeft <= 7) {
+          status = 'expiring_soon'
+        } else {
+          status = 'active'
+        }
+      } else {
+        status = 'free'
+        planType = isSchool ? 'school_free' : 'personal_free'
+      }
+
+      return {
+        id: org.id,
+        name: org.name,
+        slug: org.slug,
+        logo_url: org.logo_url,
+        is_edu: org.is_edu,
+        is_school: isSchool,
+        created_at: org.created_at,
+        owner_id: org.owner_id,
+        owner_name: owner?.full_name || null,
+        owner_email: owner?.email || null,
+        members_count: org._count?.organization_members || 0,
+        linked_schools_count: org._count?.school_links_as_school || 0,
+        plan_type: planType,
+        status, // 'active' | 'expiring_soon' | 'expired' | 'free' | 'no_owner'
+        starts_at: startsAt,
+        expires_at: expiresAt,
+        days_left: daysLeft,
+        hours_left: hoursLeft,
+        is_expired: isExpired,
+        subscription_id: subscriptionId,
+        all_subscriptions_count: allSubs.length
+      }
+    })
+
+    // Urgency sorting: expiring_soon -> expired -> active -> free -> no_owner
+    results.sort((a, b) => {
+      const priority: Record<string, number> = {
+        expiring_soon: 1,
+        expired: 2,
+        active: 3,
+        free: 4,
+        no_owner: 5
+      }
+      const pDiff = (priority[a.status] || 99) - (priority[b.status] || 99)
+      if (pDiff !== 0) return pDiff
+
+      if (a.days_left !== null && b.days_left !== null) {
+        return a.days_left - b.days_left
+      }
+      return 0
+    })
+
+    return res.status(200).json(results)
+  } catch (err: any) {
+    console.error('Error fetching org expirations:', err)
+    return res.status(500).json({ error: 'Internal Server Error' })
+  }
+}
+
+// 3c. Set / Extend Organization Subscription Expiration
+export async function setOrgExpirationAdmin(req: Request, res: Response) {
+  const { org_id, profile_id, plan_type, expires_at, days } = req.body
+
+  try {
+    let targetProfileId = profile_id
+
+    // If only org_id is provided, find owner_id
+    if (!targetProfileId && org_id) {
+      const org = await prisma.organizations.findUnique({
+        where: { id: org_id }
+      })
+      if (!org) {
+        return res.status(404).json({ error: 'Organisasi tidak ditemukan' })
+      }
+      if (!org.owner_id) {
+        return res.status(400).json({ error: 'Organisasi ini belum memiliki akun pemilik/owner.' })
+      }
+      targetProfileId = org.owner_id
+    }
+
+    if (!targetProfileId) {
+      return res.status(400).json({ error: 'Profile ID pemilik atau Org ID wajib disertakan.' })
+    }
+
+    // Calculate expiry date
+    let targetExpiry: Date
+    const now = new Date()
+
+    if (expires_at) {
+      targetExpiry = new Date(expires_at)
+    } else if (days !== undefined && Number(days) > 0) {
+      const existingActiveSub = await prisma.subscriptions.findFirst({
+        where: {
+          profile_id: targetProfileId,
+          status: 'active',
+          expires_at: { gt: now }
+        },
+        orderBy: { expires_at: 'desc' }
+      })
+
+      const baseDate = existingActiveSub ? new Date(existingActiveSub.expires_at) : now
+      targetExpiry = new Date(baseDate.getTime() + Number(days) * 24 * 60 * 60 * 1000)
+    } else {
+      targetExpiry = new Date(now)
+      targetExpiry.setFullYear(targetExpiry.getFullYear() + 1)
+    }
+
+    const sub = await prisma.subscriptions.create({
+      data: {
+        profile_id: targetProfileId,
+        plan_type: plan_type || 'plus',
+        status: 'active',
+        starts_at: now,
+        expires_at: targetExpiry,
+        amount_paid: 0
+      }
+    })
+
+    return res.status(200).json({
+      success: true,
+      message: `Masa aktif langganan berhasil diperbarui hingga ${targetExpiry.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}!`,
+      subscription: sub
+    })
+  } catch (err: any) {
+    console.error('Error setting org expiration:', err)
+    return res.status(500).json({ error: err.message || 'Gagal mengatur masa kadaluwarsa langganan' })
   }
 }
 

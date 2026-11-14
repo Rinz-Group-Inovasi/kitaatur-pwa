@@ -23,6 +23,7 @@ export function useAdminRoute() {
     isPrefixed,
     dashboardHref: isPrefixed ? '/admin' : '/',
     orgsHref: isPrefixed ? '/admin/organizations' : '/organizations',
+    expirationsHref: isPrefixed ? '/admin/expirations' : '/expirations',
     announcementsHref: isPrefixed ? '/admin/announcements' : '/announcements',
     vouchersHref: isPrefixed ? '/admin/vouchers' : '/vouchers',
     loginHref: isPrefixed ? '/admin/login' : '/login',

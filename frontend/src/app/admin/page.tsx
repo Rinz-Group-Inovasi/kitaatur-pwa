@@ -16,7 +16,8 @@ import {
   Globe, 
   Award,
   CheckCircle2,
-  Clock
+  Clock,
+  Ticket
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -24,7 +25,7 @@ import { useAdminRoute } from './useAdminRoute'
 
 export default function AdminDashboardPage() {
   const router = useRouter()
-  const { orgsHref, announcementsHref, mainAppUrl } = useAdminRoute()
+  const { orgsHref, expirationsHref, announcementsHref, vouchersHref, mainAppUrl } = useAdminRoute()
   const [stats, setStats] = useState({ totalUsers: 0, totalOrgs: 0, activeSubs: 0, totalIncome: 0 })
   const [loading, setLoading] = useState(true)
   const [maintenance, setMaintenance] = useState(false)
@@ -140,47 +141,93 @@ export default function AdminDashboardPage() {
         Dasbor Admin
       </h1>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
           <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mb-3">
             <Users className="w-6 h-6" />
           </div>
           <span className="text-3xl font-black text-slate-800">{stats.totalUsers}</span>
-          <span className="text-sm font-semibold text-slate-500">Total Pengguna</span>
+          <span className="text-xs sm:text-sm font-semibold text-slate-500">Total Pengguna</span>
         </div>
         
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
+        <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
           <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mb-3">
             <Building2 className="w-6 h-6" />
           </div>
           <span className="text-3xl font-black text-slate-800">{stats.totalOrgs}</span>
-          <span className="text-sm font-semibold text-slate-500">Total Organisasi</span>
+          <span className="text-xs sm:text-sm font-semibold text-slate-500">Total Organisasi</span>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
+        <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-slate-100 flex flex-col items-center text-center">
           <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-full flex items-center justify-center mb-3">
             <Package className="w-6 h-6" />
           </div>
           <span className="text-3xl font-black text-slate-800">{stats.activeSubs}</span>
-          <span className="text-sm font-semibold text-slate-500">Langganan Aktif</span>
+          <span className="text-xs sm:text-sm font-semibold text-slate-500">Langganan Aktif</span>
         </div>
+
+        <Link 
+          href={expirationsHref}
+          className="bg-white p-5 sm:p-6 rounded-2xl shadow-sm border border-amber-200/80 hover:border-amber-300 hover:bg-amber-50/20 transition-all flex flex-col items-center text-center group cursor-pointer"
+        >
+          <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-full flex items-center justify-center mb-3 group-hover:scale-105 transition-transform">
+            <Clock className="w-6 h-6" />
+          </div>
+          <span className="text-base sm:text-lg font-black text-amber-700">Masa Aktif</span>
+          <span className="text-xs font-semibold text-slate-500 flex items-center gap-1 group-hover:text-blue-600">
+            <span>Lihat Kadaluwarsa</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </span>
+        </Link>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-bold mb-4">Manajemen Organisasi</h2>
-          <p className="text-sm text-slate-500 mb-6">Kelola seluruh organisasi, masuk sebagai admin (Impersonate), atau berikan paket langganan secara manual.</p>
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div>
+            <h2 className="text-lg font-bold mb-2">Manajemen Organisasi</h2>
+            <p className="text-sm text-slate-500 mb-6">Kelola seluruh organisasi, masuk sebagai admin (Impersonate), atau berikan paket langganan secara manual.</p>
+          </div>
           <Link href={orgsHref} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-colors group">
             <span className="font-bold">Lihat Semua Organisasi</span>
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-          <h2 className="text-lg font-bold mb-4">Pusat Pengumuman</h2>
-          <p className="text-sm text-slate-500 mb-6">Kirim broadcast atau pesan peringatan yang akan muncul di layar semua pengguna.</p>
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-amber-200/80 bg-amber-50/10 flex flex-col justify-between">
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h2 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-amber-600" />
+                Masa Aktif & Kadaluwarsa
+              </h2>
+              <span className="bg-amber-100 text-amber-800 text-[11px] font-bold px-2 py-0.5 rounded-full">Baru</span>
+            </div>
+            <p className="text-sm text-slate-500 mb-6">Pantau organisasi yang mendekati jatuh tempo atau sudah habis masa aktifnya, dan perpanjang langganan instan.</p>
+          </div>
+          <Link href={expirationsHref} className="flex items-center justify-between p-4 bg-white border border-amber-200 rounded-xl hover:bg-amber-50 hover:text-amber-800 transition-colors group shadow-2xs">
+            <span className="font-bold text-slate-800 group-hover:text-amber-800">Buka Panel Kadaluwarsa</span>
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform text-amber-600" />
+          </Link>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div>
+            <h2 className="text-lg font-bold mb-2">Pusat Pengumuman</h2>
+            <p className="text-sm text-slate-500 mb-6">Kirim broadcast atau pesan peringatan yang akan muncul di layar semua pengguna.</p>
+          </div>
           <Link href={announcementsHref} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-colors group">
             <span className="font-bold">Kelola Broadcast</span>
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+          </Link>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-between">
+          <div>
+            <h2 className="text-lg font-bold mb-2">Voucher Diskon</h2>
+            <p className="text-sm text-slate-500 mb-6">Buat kupon promo, potongan harga langganan, dan atur kuota serta masa berlaku voucher.</p>
+          </div>
+          <Link href={vouchersHref} className="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-colors group">
+            <span className="font-bold">Kelola Voucher</span>
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
           </Link>
         </div>
