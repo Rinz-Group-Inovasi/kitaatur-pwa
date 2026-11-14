@@ -10,12 +10,71 @@ export async function getMySubscriptions(req: Request, res: Response) {
   }
 
   try {
-    const subs = await prisma.subscriptions.findMany({
+    // 1. Direct subscriptions owned by this user
+    const directSubs = await prisma.subscriptions.findMany({
       where: { profile_id: userId },
       orderBy: { created_at: 'desc' }
     })
 
-    return res.status(200).json(subs)
+    // 2. Also find organizations owned by this user or where user is member
+    const userOrgs = await prisma.organizations.findMany({
+      where: {
+        OR: [
+          { owner_id: userId },
+          { organization_members: { some: { profile_id: userId } } }
+        ]
+      },
+      include: {
+        owner: true,
+        organization_members: {
+          include: {
+            profile: {
+              include: {
+                subscriptions: {
+                  where: { status: 'active' },
+                  orderBy: { created_at: 'desc' }
+                }
+              }
+            }
+          }
+        }
+      }
+    })
+
+    const memberSubs: any[] = []
+    for (const org of userOrgs) {
+      for (const m of org.organization_members) {
+        if (m.profile_id !== userId && m.profile?.subscriptions) {
+          for (const s of m.profile.subscriptions) {
+            memberSubs.push({
+              ...s,
+              organization_name: org.name,
+              organization_slug: org.slug,
+              purchased_by: {
+                name: m.profile.full_name,
+                email: m.profile.email,
+                role: m.role
+              }
+            })
+          }
+        }
+      }
+    }
+
+    const existingIds = new Set(directSubs.map(s => s.id))
+    const allSubs = [
+      ...directSubs.map(s => {
+        const relatedOrg = userOrgs.find(o => o.owner_id === userId) || userOrgs[0]
+        return {
+          ...s,
+          organization_name: relatedOrg?.name || null,
+          organization_slug: relatedOrg?.slug || null
+        }
+      }),
+      ...memberSubs.filter(s => !existingIds.has(s.id))
+    ]
+
+    return res.status(200).json(allSubs)
   } catch (err: any) {
     console.error('Error fetching subscriptions:', err)
     return res.status(500).json({ error: 'Internal Server Error' })

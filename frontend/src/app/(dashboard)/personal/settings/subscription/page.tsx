@@ -1,114 +1,610 @@
 'use client'
+
 import { useEffect, useState } from 'react'
-import { api } from '@/lib/api'
+import { api, supabase } from '@/lib/api'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Clock, CheckCircle2, Package, Sparkles } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { 
+  ArrowLeft, 
+  HelpCircle, 
+  Sparkles, 
+  ChevronRight, 
+  Clock, 
+  CheckCircle2, 
+  AlertCircle, 
+  QrCode, 
+  X, 
+  Loader2, 
+  Ticket, 
+  ExternalLink,
+  ShieldCheck,
+  Building2,
+  Calendar
+} from 'lucide-react'
+import toast from 'react-hot-toast'
 import dayjs from 'dayjs'
 import 'dayjs/locale/id'
 
-export default function SubscriptionSettingsPage() {
-  const [subs, setSubs] = useState<any[]>([])
+interface SubscriptionItem {
+  id: string
+  profile_id: string
+  plan_type: string
+  status: 'active' | 'unpaid' | 'cancelled' | 'expired' | string
+  amount_paid: number | string | null
+  starts_at: string
+  expires_at: string
+  created_at: string
+  organization_name?: string | null
+  organization_slug?: string | null
+  payment_url?: string | null
+  voucher_code?: string | null
+  discount_amount?: number | null
+  original_amount?: number | null
+}
+
+export default function GoogleStyleSubscriptionPage() {
+  const router = useRouter()
+  const [subs, setSubs] = useState<SubscriptionItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [user, setUser] = useState<any>(null)
+
+  // Renew / Checkout modal state
+  const [renewModal, setRenewModal] = useState<{
+    isOpen: boolean
+    sub: SubscriptionItem | null
+    planCycle: 'monthly' | 'yearly'
+    loading: boolean
+    voucherCode: string
+    voucherLoading: boolean
+    appliedVoucher: any | null
+    checkoutData: any | null
+  }>({
+    isOpen: false,
+    sub: null,
+    planCycle: 'monthly',
+    loading: false,
+    voucherCode: '',
+    voucherLoading: false,
+    appliedVoucher: null,
+    checkoutData: null
+  })
 
   useEffect(() => {
-    const fetchSubs = async () => {
-      try {
-        const res = await api.get('/subscription/me')
-        setSubs(res.data)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
-    }
-    fetchSubs()
+    loadData()
   }, [])
 
-  return (
-    <div className="min-h-screen bg-slate-50 p-6 md:p-10">
-      <div className="max-w-4xl mx-auto">
-        <Link href="/personal/dashboard" className="inline-flex items-center gap-2 text-slate-500 hover:text-slate-900 mb-8 text-sm font-medium">
-          <ArrowLeft className="w-4 h-4" />
-          Kembali ke Dasbor
-        </Link>
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      const [{ data: { user: authUser } }, res] = await Promise.all([
+        supabase.auth.getUser(),
+        api.get('/subscription/me').catch(() => ({ data: [] }))
+      ])
+      setUser(authUser)
+      setSubs(res.data || [])
+    } catch (err) {
+      console.error('Error loading subscriptions:', err)
+      toast.error('Gagal memuat data langganan')
+    } finally {
+      setLoading(false)
+    }
+  }
 
-        <h1 className="text-2xl font-bold text-slate-900 mb-6">Riwayat Langganan</h1>
+  const now = new Date()
+
+  // Partition into Active and Inactive (matching Google's UI)
+  const activeSubs = subs.filter((s) => {
+    const isNotExpired = s.expires_at ? new Date(s.expires_at) >= now : false
+    return s.status === 'active' && isNotExpired
+  })
+
+  const inactiveSubs = subs.filter((s) => {
+    const isNotExpired = s.expires_at ? new Date(s.expires_at) >= now : false
+    return !(s.status === 'active' && isNotExpired)
+  })
+
+  const formatGoogleDate = (dateStr?: string | null) => {
+    if (!dateStr) return '-'
+    const d = new Date(dateStr)
+    return d.toLocaleDateString('id-ID', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    })
+  }
+
+  const getPlanDisplayName = (sub: SubscriptionItem) => {
+    const raw = (sub.plan_type || '').toLowerCase()
+    let base = 'KitaAtur Plus'
+    if (raw.includes('trial')) base = 'KitaAtur Plus (Uji Coba 7 Hari)'
+    else if (raw.includes('pro')) base = 'KitaAtur Pro'
+    else if (raw.includes('family')) base = 'KitaAtur Family'
+    else if (raw.includes('school') || raw.includes('enterprise')) base = 'KitaAtur School Enterprise'
+
+    if (sub.organization_name) {
+      return `${base} · ${sub.organization_name}`
+    }
+    return base
+  }
+
+  const getPlanCycleName = (sub: SubscriptionItem) => {
+    const raw = (sub.plan_type || '').toLowerCase()
+    if (raw.includes('yearly')) return 'Langganan Tahunan'
+    if (raw.includes('trial')) return 'Uji Coba Gratis'
+    return 'Langganan Bulanan'
+  }
+
+  // Open renewal modal
+  const handleOpenRenew = (sub: SubscriptionItem) => {
+    const isYearly = (sub.plan_type || '').toLowerCase().includes('yearly')
+    setRenewModal({
+      isOpen: true,
+      sub,
+      planCycle: isYearly ? 'yearly' : 'monthly',
+      loading: false,
+      voucherCode: '',
+      voucherLoading: false,
+      appliedVoucher: null,
+      checkoutData: null
+    })
+  }
+
+  const handleApplyVoucher = async () => {
+    if (!renewModal.voucherCode.trim()) return
+    setRenewModal(prev => ({ ...prev, voucherLoading: true }))
+
+    const basePrice = renewModal.planCycle === 'yearly' ? 444000 : 44400
+    try {
+      const res = await api.post('/payment/validate-voucher', {
+        code: renewModal.voucherCode.trim().toUpperCase(),
+        planType: `plus-${renewModal.planCycle}`,
+        baseAmount: basePrice
+      })
+      setRenewModal(prev => ({
+        ...prev,
+        appliedVoucher: res.data,
+        voucherLoading: false
+      }))
+      toast.success(`Voucher "${res.data.voucher.code}" berhasil diterapkan!`)
+    } catch (err: any) {
+      const msg = err.response?.data?.error || 'Kode voucher tidak valid'
+      toast.error(msg)
+      setRenewModal(prev => ({ ...prev, voucherLoading: false }))
+    }
+  }
+
+  const handleProceedCheckout = async () => {
+    if (!user) return toast.error('Silakan login terlebih dahulu')
+    setRenewModal(prev => ({ ...prev, loading: true }))
+
+    const basePrice = renewModal.planCycle === 'yearly' ? 444000 : 44400
+    const finalPrice = renewModal.appliedVoucher 
+      ? Number(renewModal.appliedVoucher.finalAmount) 
+      : basePrice
+
+    try {
+      const res = await api.post('/payment/checkout', {
+        planType: `plus-${renewModal.planCycle}`,
+        amount: basePrice,
+        userId: user.id,
+        voucherCode: renewModal.appliedVoucher?.voucher?.code || undefined
+      })
+
+      if (res.data.isFree) {
+        toast.success('Langganan berhasil diaktifkan dengan voucher 100%!')
+        setRenewModal(prev => ({ ...prev, isOpen: false, loading: false }))
+        loadData()
+        return
+      }
+
+      if (res.data.subscriptionId) {
+        // Redirect directly to payment QRIS page
+        router.push(`/payment/${res.data.subscriptionId}`)
+      } else {
+        toast.error('Gagal membuat transaksi pembayaran')
+        setRenewModal(prev => ({ ...prev, loading: false }))
+      }
+    } catch (err: any) {
+      console.error('Checkout error:', err)
+      toast.error(err.response?.data?.error || 'Gagal memproses pembayaran')
+      setRenewModal(prev => ({ ...prev, loading: false }))
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F8FAFD] text-slate-800 font-sans selection:bg-blue-100 selection:text-blue-900 pb-24">
+      {/* Google-Style Clean Top Navigation Header (NO 3x3 Grid Dots) */}
+      <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200/80">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+          {/* Left: Brand "KitaAtur Akun" */}
+          <Link href="/personal/dashboard" className="flex items-center gap-2 group">
+            <div className="w-8 h-8 rounded-xl bg-blue-500/10 flex items-center justify-center p-1.5 border border-blue-500/20 group-hover:scale-105 transition-transform">
+              <img src="/logo.png" alt="KitaAtur" className="w-full h-full object-contain" />
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="font-semibold text-lg text-slate-900 tracking-tight">KitaAtur</span>
+              <span className="text-base text-slate-600 font-medium">Akun</span>
+            </div>
+          </Link>
+
+          {/* Right: Help Icon + User Avatar (NO 3x3 App Launcher Icon) */}
+          <div className="flex items-center gap-3">
+            <a
+              href="mailto:support.kitaatur@gmail.com"
+              title="Pusat Bantuan"
+              className="w-9 h-9 rounded-full flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-colors"
+            >
+              <HelpCircle className="w-5 h-5 text-slate-600" />
+            </a>
+
+            <div 
+              className="w-9 h-9 rounded-full bg-gradient-to-tr from-[#0087FF] to-sky-400 text-white font-bold text-sm flex items-center justify-center ring-2 ring-white shadow-2xs overflow-hidden"
+              title={user?.email || 'Akun Saya'}
+            >
+              {user?.user_metadata?.avatar_url ? (
+                <img src={user.user_metadata.avatar_url} alt="" className="w-full h-full object-cover" />
+              ) : (
+                (user?.email || 'U').charAt(0).toUpperCase()
+              )}
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Container */}
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 pt-8">
+        {/* Title Header with Google Back Arrow */}
+        <div className="flex items-center gap-4 mb-6">
+          <Link
+            href="/personal/dashboard"
+            className="w-10 h-10 rounded-full flex items-center justify-center text-slate-700 hover:bg-slate-200/60 transition-colors shrink-0"
+            aria-label="Kembali ke Dasbor"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </Link>
+          <h1 className="text-2xl sm:text-3xl font-normal text-slate-900 tracking-tight">
+            Langganan
+          </h1>
+        </div>
+
+        {/* Section: "Dikelola oleh KitaAtur" */}
+        <div className="mb-8 pl-1 sm:pl-2">
+          <h2 className="text-base font-medium text-slate-900 mb-1">
+            Dikelola oleh KitaAtur
+          </h2>
+          <p className="text-sm text-slate-600 leading-relaxed max-w-xl">
+            Beberapa langganan mungkin diperpanjang secara otomatis atau manual oleh pengurus. Anda dapat mengelola paket dan metode pembayaran di{' '}
+            <Link href="/upgrade" className="text-[#0087FF] hover:underline font-medium">
+              Pusat Langganan KitaAtur
+            </Link>
+            .
+          </p>
+        </div>
 
         {loading ? (
-          <div className="space-y-4 animate-pulse">
-            {[1, 2].map(i => (
-              <div key={i} className="bg-white rounded-2xl border border-slate-200 p-6 flex justify-between items-center">
-                <div className="space-y-2">
-                  <div className="h-5 w-40 bg-slate-200 rounded-md" />
-                  <div className="h-4 w-28 bg-slate-100 rounded-md" />
-                </div>
-                <div className="h-8 w-24 bg-slate-100 rounded-lg" />
-              </div>
-            ))}
+          <div className="space-y-6">
+            <div className="h-4 w-24 bg-slate-200 rounded animate-pulse mb-3" />
+            <div className="bg-white rounded-2xl border border-slate-200/80 p-6 space-y-4 shadow-2xs">
+              <div className="h-6 w-48 bg-slate-200 rounded animate-pulse" />
+              <div className="h-4 w-36 bg-slate-100 rounded animate-pulse" />
+              <div className="h-4 w-64 bg-slate-100 rounded animate-pulse" />
+            </div>
           </div>
         ) : subs.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
-            <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4 text-slate-400">
-              <Package className="w-8 h-8" />
+          /* Empty State */
+          <div className="bg-white rounded-2xl border border-slate-200/80 p-8 text-center shadow-2xs">
+            <div className="w-14 h-14 rounded-2xl bg-blue-50 text-[#0087FF] flex items-center justify-center mx-auto mb-4 border border-blue-100">
+              <Sparkles className="w-7 h-7" />
             </div>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">Belum ada langganan</h3>
-            <p className="text-slate-500 mb-6 max-w-sm mx-auto">Anda belum pernah membuat tagihan atau berlangganan paket apapun.</p>
-            <Link href="/upgrade" className="inline-flex px-6 py-2.5 bg-slate-900 text-white font-medium rounded-xl hover:bg-slate-800 transition-colors">
-              Lihat Paket
+            <h3 className="text-base font-semibold text-slate-900 mb-1">
+              Belum Ada Langganan Aktif
+            </h3>
+            <p className="text-xs text-slate-500 max-w-md mx-auto mb-6 leading-relaxed">
+              Organisasi atau akun Anda saat ini menggunakan paket Personal Gratis. Aktifkan KitaAtur Plus untuk membuka presensi barcode, pembukuan kas otomatis, dan rekapan tanpa batas.
+            </p>
+            <Link
+              href="/upgrade"
+              className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#0087FF] hover:bg-[#0077E6] text-white text-xs font-bold transition shadow-sm shadow-blue-500/20 active:scale-95"
+            >
+              <Sparkles className="w-4 h-4" />
+              <span>Lihat & Pilih Paket</span>
             </Link>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="divide-y divide-slate-100">
-              {subs.map(sub => (
-                <Link 
-                  href={`/payment/${sub.id}`} 
-                  key={sub.id}
-                  className="flex items-center justify-between p-5 hover:bg-slate-50 transition-colors group"
-                >
-                  <div>
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="font-bold text-slate-900 capitalize">
-                        {sub.plan_type.includes('trial') ? 'KitaAtur Plus (Trial 7 Hari)' : `KitaAtur ${sub.plan_type.replace('-', ' ')}`}
-                      </span>
-                      {sub.plan_type.includes('trial') ? (
-                        sub.status === 'active' && new Date(sub.expires_at) > new Date() ? (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[10px] font-bold uppercase tracking-wider">
-                            <Sparkles className="w-3 h-3 text-blue-600" /> Uji Coba Aktif
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
-                            Uji Coba Berakhir
-                          </span>
-                        )
-                      ) : sub.status === 'unpaid' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-bold uppercase tracking-wider">
-                          <Clock className="w-3 h-3" /> Menunggu Pembayaran
-                        </span>
-                      ) : sub.status === 'active' ? (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[10px] font-bold uppercase tracking-wider">
-                          <CheckCircle2 className="w-3 h-3" /> Lunas
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-[10px] font-bold uppercase tracking-wider">
-                          {sub.status}
-                        </span>
-                      )}
-                    </div>
-                    <div className="text-sm text-slate-500">
-                      Dibuat pada {dayjs(sub.created_at).locale('id').format('DD MMM YYYY HH:mm')}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <span className="font-bold text-slate-900">Rp {Number(sub.amount_paid).toLocaleString('id-ID')}</span>
-                    <ArrowRight className="w-5 h-5 text-slate-300 group-hover:text-blue-500 transition-colors" />
-                  </div>
-                </Link>
-              ))}
-            </div>
+          <div className="space-y-8">
+            {/* 1. SECTION: AKTIF */}
+            {activeSubs.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 pl-1 flex items-center gap-2">
+                  <span>Aktif</span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                </h3>
+
+                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden divide-y divide-slate-100">
+                  {activeSubs.map((sub) => {
+                    const daysLeft = sub.expires_at 
+                      ? Math.ceil((new Date(sub.expires_at).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+                      : null
+                    const isExpiringSoon = daysLeft !== null && daysLeft <= 7
+
+                    return (
+                      <div
+                        key={sub.id}
+                        className="p-4 sm:p-5 hover:bg-slate-50/70 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                      >
+                        {/* Left: Icon & Details */}
+                        <div className="flex items-start gap-4 min-w-0">
+                          {/* App Icon (Google-style rounded square) */}
+                          <div className="w-12 h-12 rounded-xl bg-gradient-to-tr from-blue-600 to-sky-400 text-white flex items-center justify-center shrink-0 shadow-2xs border border-blue-400/20 p-2.5">
+                            <img src="/logo.png" alt="KitaAtur" className="w-full h-full object-contain brightness-0 invert" />
+                          </div>
+
+                          <div className="min-w-0">
+                            {/* Blue Title Link */}
+                            <h4 className="text-sm sm:text-base font-semibold text-[#0087FF] hover:underline cursor-pointer truncate">
+                              {getPlanDisplayName(sub)}
+                            </h4>
+
+                            {/* Subtitle / Plan Cycle */}
+                            <p className="text-xs text-slate-600 mt-0.5 font-medium">
+                              {getPlanCycleName(sub)}
+                              {sub.amount_paid ? ` • Rp ${Number(sub.amount_paid).toLocaleString('id-ID')}` : ''}
+                            </p>
+
+                            {/* Expiration Text (Google Subscriptions Style) */}
+                            <p className="text-xs text-slate-500 mt-1">
+                              Masa berlaku habis pada tanggal{' '}
+                              <strong className="text-slate-700 font-semibold">
+                                {formatGoogleDate(sub.expires_at)}
+                              </strong>
+                            </p>
+
+                            {/* Expiring Soon Badge */}
+                            {isExpiringSoon && (
+                              <div className="mt-2 inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-bold">
+                                <Clock className="w-3 h-3 text-amber-600 animate-pulse" />
+                                <span>{daysLeft === 0 ? 'Berakhir Hari Ini' : `Sisa ${daysLeft} Hari Lagi`}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                          <button
+                            onClick={() => handleOpenRenew(sub)}
+                            className="px-4 py-2 rounded-full bg-[#0087FF] hover:bg-[#0077E6] text-white text-xs font-bold transition shadow-2xs hover:shadow-xs active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <span>Perpanjang</span>
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* 2. SECTION: TIDAK AKTIF (Matching User Screenshot) */}
+            {inactiveSubs.length > 0 && (
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 mb-3 pl-1">
+                  Tidak aktif
+                </h3>
+
+                <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden divide-y divide-slate-100">
+                  {inactiveSubs.map((sub) => {
+                    const isUnpaid = sub.status === 'unpaid'
+
+                    return (
+                      <div
+                        key={sub.id}
+                        className="p-4 sm:p-5 hover:bg-slate-50/70 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-4 group"
+                      >
+                        {/* Left: Icon & Details */}
+                        <div className="flex items-start gap-4 min-w-0">
+                          {/* App Icon (Google-style rounded square, slate tone) */}
+                          <div className="w-12 h-12 rounded-xl bg-slate-100 border border-slate-200 text-slate-400 flex items-center justify-center shrink-0 p-2.5">
+                            <img src="/logo.png" alt="KitaAtur" className="w-full h-full object-contain grayscale opacity-60" />
+                          </div>
+
+                          <div className="min-w-0">
+                            {/* Blue Title Link */}
+                            <h4 className="text-sm sm:text-base font-semibold text-[#0087FF] hover:underline cursor-pointer truncate">
+                              {getPlanDisplayName(sub)}
+                            </h4>
+
+                            {/* Subtitle / Plan Cycle */}
+                            <p className="text-xs text-slate-600 mt-0.5 font-medium">
+                              {getPlanCycleName(sub)}
+                              {sub.amount_paid ? ` • Rp ${Number(sub.amount_paid).toLocaleString('id-ID')}` : ''}
+                            </p>
+
+                            {/* Expiration Text (Exact copy of Google Screenshot: "Masa berlaku habis pada tanggal ...") */}
+                            <p className="text-xs text-slate-500 mt-1">
+                              {isUnpaid ? (
+                                <span className="text-amber-700 font-semibold">Menunggu Pembayaran</span>
+                              ) : (
+                                <>
+                                  Masa berlaku habis pada tanggal{' '}
+                                  <span className="text-slate-600 font-medium">
+                                    {formatGoogleDate(sub.expires_at)}
+                                  </span>
+                                </>
+                              )}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Right: Actions */}
+                        <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+                          <button
+                            onClick={() => handleOpenRenew(sub)}
+                            className="px-4 py-2 rounded-full border border-slate-300 hover:border-[#0087FF] hover:bg-blue-50/50 text-[#0087FF] text-xs font-bold transition shadow-2xs active:scale-95 flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <span>Aktifkan Kembali</span>
+                            <ChevronRight className="w-3.5 h-3.5 text-slate-400 group-hover:text-[#0087FF]" />
+                          </button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         )}
-      </div>
+      </main>
+
+      {/* RENEWAL / EXTENSION MODAL (Google Styled Dialog) */}
+      {renewModal.isOpen && renewModal.sub && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md rounded-3xl border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Perpanjang Langganan
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">
+                  {getPlanDisplayName(renewModal.sub)}
+                </p>
+              </div>
+              <button
+                onClick={() => setRenewModal(prev => ({ ...prev, isOpen: false }))}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 space-y-5">
+              {/* Cycle Toggle (Bulanan vs Tahunan) */}
+              <div>
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-2">
+                  Pilih Periode Perpanjangan
+                </label>
+                <div className="grid grid-cols-2 gap-2.5 bg-slate-100 p-1 rounded-2xl">
+                  <button
+                    type="button"
+                    onClick={() => setRenewModal(prev => ({ ...prev, planCycle: 'monthly', appliedVoucher: null }))}
+                    className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+                      renewModal.planCycle === 'monthly'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    Bulanan (Rp 44.400)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRenewModal(prev => ({ ...prev, planCycle: 'yearly', appliedVoucher: null }))}
+                    className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                      renewModal.planCycle === 'yearly'
+                        ? 'bg-white text-slate-900 shadow-xs'
+                        : 'text-slate-500 hover:text-slate-900'
+                    }`}
+                  >
+                    <span>Tahunan</span>
+                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-black">
+                      Hemat
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Price Details */}
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span>Harga Normal</span>
+                  <span>
+                    Rp {renewModal.planCycle === 'yearly' ? '444.000' : '44.400'}
+                  </span>
+                </div>
+
+                {renewModal.appliedVoucher && (
+                  <div className="flex items-center justify-between text-xs text-emerald-600 font-semibold">
+                    <span>Diskon Voucher ({renewModal.appliedVoucher.voucher.code})</span>
+                    <span>- Rp {Number(renewModal.appliedVoucher.discountAmount).toLocaleString('id-ID')}</span>
+                  </div>
+                )}
+
+                <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                  <span className="text-xs font-bold text-slate-900">Total Pembayaran</span>
+                  <span className="text-lg font-black text-[#0087FF]">
+                    Rp {renewModal.appliedVoucher 
+                      ? Number(renewModal.appliedVoucher.finalAmount).toLocaleString('id-ID')
+                      : (renewModal.planCycle === 'yearly' ? '444.000' : '44.400')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Voucher Input */}
+              <div>
+                <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                  Punya Kode Voucher? (Opsional)
+                </label>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Ticket className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      placeholder="Contoh: MERDEKA50"
+                      value={renewModal.voucherCode}
+                      onChange={(e) => setRenewModal(prev => ({ ...prev, voucherCode: e.target.value.toUpperCase() }))}
+                      className="w-full pl-9 pr-3 py-2 text-xs uppercase font-mono font-bold bg-white border border-slate-200 rounded-xl focus:outline-hidden focus:border-blue-500"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleApplyVoucher}
+                    disabled={renewModal.voucherLoading || !renewModal.voucherCode.trim()}
+                    className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-bold transition shrink-0"
+                  >
+                    {renewModal.voucherLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Gunakan'}
+                  </button>
+                </div>
+              </div>
+
+              {/* Security notice */}
+              <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>Pembayaran resmi & terenkripsi otomatis via QRIS KitaPay.</span>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-6 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setRenewModal(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200/60 transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleProceedCheckout}
+                disabled={renewModal.loading}
+                className="px-5 py-2.5 rounded-xl bg-[#0087FF] hover:bg-[#0077E6] disabled:opacity-50 text-white text-xs font-bold transition flex items-center gap-2 shadow-sm shadow-blue-500/20 active:scale-95"
+              >
+                {renewModal.loading ? (
+                  <>
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    <span>Memproses QRIS...</span>
+                  </>
+                ) : (
+                  <>
+                    <QrCode className="w-4 h-4" />
+                    <span>Lanjut Bayar QRIS</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
