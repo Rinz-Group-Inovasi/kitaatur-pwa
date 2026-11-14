@@ -671,29 +671,37 @@ export default function OrgDashboardPage() {
                 Perpanjang Langganan
               </Link>
             </div>
-          ) : trialInfo.daysLeft !== null && trialInfo.daysLeft <= 3 ? (
-            <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-slate-900 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="flex items-start sm:items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
-                  <Clock className="w-5 h-5" />
+          ) : trialInfo.daysLeft !== null && trialInfo.daysLeft <= 7 ? (
+            <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-amber-50 border border-amber-300 text-slate-900 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              <div className="flex items-start sm:items-center gap-3.5">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center shrink-0 border border-amber-200">
+                  <Clock className="w-5 h-5 animate-pulse" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="text-xs font-bold text-slate-900">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className="text-xs font-black text-slate-900">
                       Langganan Akan Segera Berakhir
                     </span>
-                    <span className="text-xs text-amber-800 font-bold bg-amber-200/60 px-2 py-0.5 rounded-full">
-                      Sisa {trialInfo.daysLeft === 0 ? `${trialInfo.hoursLeft} Jam` : `${trialInfo.daysLeft} Hari`} Lagi
+                    <span className={`text-[11px] font-extrabold px-2.5 py-0.5 rounded-full border ${
+                      trialInfo.daysLeft <= 2
+                        ? 'bg-rose-100 text-rose-800 border-rose-300 animate-pulse'
+                        : 'bg-amber-100 text-amber-900 border-amber-300'
+                    }`}>
+                      {trialInfo.daysLeft === 0 
+                        ? `Sisa ${trialInfo.hoursLeft} Jam Lagi` 
+                        : trialInfo.daysLeft === 1
+                        ? 'Berakhir Hari Ini!'
+                        : `Sisa ${trialInfo.daysLeft} Hari Lagi`}
                     </span>
                   </div>
-                  <p className="text-xs text-slate-600 font-normal">
-                    Masa aktif berakhir pada {new Date(trialInfo.expiresAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}. Perpanjang sekarang agar operasional organisasi tetap lancar.
+                  <p className="text-xs text-slate-600 font-normal leading-relaxed">
+                    Masa aktif berakhir pada <strong>{new Date(trialInfo.expiresAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}</strong>. Perpanjang sekarang agar operasional kas & presensi anggota tetap berjalan lancar tanpa kendala.
                   </p>
                 </div>
               </div>
               <Link
                 href="/upgrade"
-                className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-all shrink-0 shadow-sm shadow-amber-600/20 active:scale-95"
+                className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-black rounded-xl transition-all shrink-0 shadow-md shadow-amber-500/25 active:scale-95 text-center"
               >
                 Perpanjang Sekarang
               </Link>
