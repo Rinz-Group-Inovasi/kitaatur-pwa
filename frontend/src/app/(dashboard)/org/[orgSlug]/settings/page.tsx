@@ -705,8 +705,8 @@ export default function OrgSettingsPage() {
               ) : (
                 <div className="mb-6 bg-[#E0F4FE]/70 border border-[#b9e5fa] p-4 rounded-xl flex flex-col items-center text-center">
                   <p className="text-sm text-slate-800 font-medium mb-3">Upgrade ke Premium untuk mulai membuat Organisasi dan mengundang tim Anda.</p>
-                  <Link href="/upgrade" className="bg-[#0087FF] hover:bg-[#0077E6] text-white font-bold px-6 py-2.5 rounded-full shadow-sm text-sm transition-all">
-                    Upgrade Sekarang
+                  <Link href="/personal/settings/subscription" className="bg-[#0087FF] hover:bg-[#0077E6] text-white font-bold px-6 py-2.5 rounded-full shadow-sm text-sm transition-all">
+                    Kelola / Perpanjang Langganan
                   </Link>
                 </div>
               )}

@@ -205,8 +205,8 @@ export default function PersonalDashboard() {
               <span className="text-xl font-extrabold tracking-tight text-slate-900">KitaAtur</span>
             </div>
             {!isVerified && (
-              <Link href="/upgrade" className="bg-[#0087FF] hover:bg-[#0077E6] text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-md shadow-blue-500/20 transition-all">
-                Upgrade
+              <Link href="/personal/settings/subscription" className="bg-[#0087FF] hover:bg-[#0077E6] text-white text-sm font-bold px-4 py-1.5 rounded-full shadow-md shadow-blue-500/20 transition-all">
+                Kelola Langganan
               </Link>
             )}
           </div>

@@ -615,7 +615,7 @@ export default function OrgDashboardPage() {
                 </div>
               </div>
               <Link
-                href="/upgrade"
+                href="/personal/settings/subscription"
                 className="px-4 py-2 bg-[#0087FF] hover:bg-[#0077E6] text-white text-xs font-bold rounded-xl transition-colors shrink-0 shadow-sm shadow-blue-500/20"
               >
                 Berlangganan Sekarang
@@ -637,7 +637,7 @@ export default function OrgDashboardPage() {
                 </div>
               </div>
               <Link
-                href="/upgrade"
+                href="/personal/settings/subscription"
                 className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl transition-colors shrink-0"
               >
                 Upgrade Sekarang
@@ -665,7 +665,7 @@ export default function OrgDashboardPage() {
                 </div>
               </div>
               <Link
-                href="/upgrade"
+                href="/personal/settings/subscription"
                 className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all shrink-0 shadow-sm shadow-rose-600/20 active:scale-95"
               >
                 Perpanjang Langganan
@@ -700,7 +700,7 @@ export default function OrgDashboardPage() {
                 </div>
               </div>
               <Link
-                href="/upgrade"
+                href="/personal/settings/subscription"
                 className="w-full sm:w-auto px-5 py-2.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-white text-xs font-black rounded-xl transition-all shrink-0 shadow-md shadow-amber-500/25 active:scale-95 text-center"
               >
                 Perpanjang Sekarang

@@ -394,7 +394,9 @@ export default function GoogleStyleSubscriptionPage() {
 
                 <div className="bg-white rounded-2xl border border-slate-200/80 shadow-2xs overflow-hidden divide-y divide-slate-100">
                   {inactiveSubs.map((sub) => {
-                    const isUnpaid = sub.status === 'unpaid'
+                    const isWaitingPayment = sub.status === 'unpaid' && 
+                      new Date(sub.expires_at) >= now && 
+                      (now.getTime() - new Date(sub.created_at).getTime()) < 60 * 60 * 1000
 
                     return (
                       <div
@@ -422,13 +424,13 @@ export default function GoogleStyleSubscriptionPage() {
 
                             {/* Expiration Text (Exact copy of Google Screenshot: "Masa berlaku habis pada tanggal ...") */}
                             <p className="text-xs text-slate-500 mt-1">
-                              {isUnpaid ? (
+                              {isWaitingPayment ? (
                                 <span className="text-amber-700 font-semibold">Menunggu Pembayaran</span>
                               ) : (
                                 <>
                                   Masa berlaku habis pada tanggal{' '}
                                   <span className="text-slate-600 font-medium">
-                                    {formatGoogleDate(sub.expires_at)}
+                                    {formatGoogleDate(sub.expires_at || sub.created_at)}
                                   </span>
                                 </>
                               )}

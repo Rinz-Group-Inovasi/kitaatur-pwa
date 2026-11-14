@@ -10,6 +10,23 @@ export async function getMySubscriptions(req: Request, res: Response) {
   }
 
   try {
+    const now = new Date()
+    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000)
+
+    // 0. Auto-expire unpaid checkouts whose QRIS payment window has passed
+    await prisma.subscriptions.updateMany({
+      where: {
+        status: 'unpaid',
+        OR: [
+          { expires_at: { lt: now } },
+          { created_at: { lt: oneHourAgo } }
+        ]
+      },
+      data: {
+        status: 'past_due'
+      }
+    })
+
     // 1. Direct subscriptions owned by this user
     const directSubs = await prisma.subscriptions.findMany({
       where: { profile_id: userId },

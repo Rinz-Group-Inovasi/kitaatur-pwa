@@ -221,7 +221,7 @@ export default function OrgTransactionForm({ orgSlug, onSuccess }: OrgTransactio
             <span>{error}</span>
             {error.toLowerCase().includes('langganan') && (
               <a
-                href="/upgrade"
+                href="/personal/settings/subscription"
                 className="px-3 py-1.5 rounded-lg bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition shrink-0"
               >
                 Perpanjang Langganan

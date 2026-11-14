@@ -167,3 +167,4 @@ export async function requireActiveOrgSubscription(
     return res.status(500).json({ error: 'Gagal memvalidasi status langganan organisasi' })
   }
 }
+
