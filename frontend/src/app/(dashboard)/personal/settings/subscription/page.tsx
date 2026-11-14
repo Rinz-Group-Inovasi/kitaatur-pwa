@@ -92,13 +92,60 @@ export default function GoogleStyleSubscriptionPage() {
 
   const now = new Date()
 
+  // Consolidate subscriptions so exactly ONE card is shown per organization or unique plan (Google Style)
+  const consolidateSubs = (items: SubscriptionItem[]) => {
+    const groups = new Map<string, SubscriptionItem[]>()
+    for (const s of items) {
+      const key = s.organization_slug
+        ? `org:${s.organization_slug}`
+        : s.organization_name
+        ? `org_name:${s.organization_name}`
+        : `plan:${s.plan_type || 'personal'}`
+
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(s)
+    }
+
+    const result: SubscriptionItem[] = []
+    groups.forEach((group) => {
+      // 1. Prioritize active subscription
+      const activeSub = group.find((s: SubscriptionItem) => {
+        const isNotExpired = s.expires_at ? new Date(s.expires_at) >= now : false
+        return s.status === 'active' && isNotExpired
+      })
+      if (activeSub) {
+        result.push(activeSub)
+        return
+      }
+
+      // 2. Otherwise pick the single best inactive subscription (prefer real payment, then latest expiry/creation)
+      const sorted = [...group].sort((a: SubscriptionItem, b: SubscriptionItem) => {
+        const aPaid = (Number(a.amount_paid) || 0) > 0 ? 1 : 0
+        const bPaid = (Number(b.amount_paid) || 0) > 0 ? 1 : 0
+        if (aPaid !== bPaid) return bPaid - aPaid
+
+        const aExp = a.expires_at ? new Date(a.expires_at).getTime() : 0
+        const bExp = b.expires_at ? new Date(b.expires_at).getTime() : 0
+        if (aExp !== bExp) return bExp - aExp
+
+        const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0
+        const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0
+        return bCreated - aCreated
+      })
+      result.push(sorted[0])
+    })
+    return result
+  }
+
+  const consolidatedSubs = consolidateSubs(subs)
+
   // Partition into Active and Inactive (matching Google's UI)
-  const activeSubs = subs.filter((s) => {
+  const activeSubs = consolidatedSubs.filter((s) => {
     const isNotExpired = s.expires_at ? new Date(s.expires_at) >= now : false
     return s.status === 'active' && isNotExpired
   })
 
-  const inactiveSubs = subs.filter((s) => {
+  const inactiveSubs = consolidatedSubs.filter((s) => {
     const isNotExpired = s.expires_at ? new Date(s.expires_at) >= now : false
     return !(s.status === 'active' && isNotExpired)
   })

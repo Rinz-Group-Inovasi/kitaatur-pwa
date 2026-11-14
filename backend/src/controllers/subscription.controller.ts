@@ -91,7 +91,49 @@ export async function getMySubscriptions(req: Request, res: Response) {
       ...memberSubs.filter(s => !existingIds.has(s.id))
     ]
 
-    return res.status(200).json(allSubs)
+    // Consolidate subscriptions: exactly ONE card per organization or unique plan
+    const groups = new Map<string, any[]>()
+    for (const s of allSubs) {
+      const key = s.organization_slug
+        ? `org:${s.organization_slug}`
+        : s.organization_name
+        ? `org_name:${s.organization_name}`
+        : `plan:${s.plan_type || 'personal'}`
+
+      if (!groups.has(key)) groups.set(key, [])
+      groups.get(key)!.push(s)
+    }
+
+    const consolidated: any[] = []
+    for (const [, group] of groups.entries()) {
+      // 1. If there's an active sub, prioritize it
+      const activeSub = group.find((s) => {
+        const isNotExpired = s.expires_at ? new Date(s.expires_at) >= now : false
+        return s.status === 'active' && isNotExpired
+      })
+      if (activeSub) {
+        consolidated.push(activeSub)
+        continue
+      }
+
+      // 2. Otherwise pick the best inactive/expired sub (real payment first, then latest expiry/creation)
+      const sorted = [...group].sort((a, b) => {
+        const aPaid = (Number(a.amount_paid) || 0) > 0 ? 1 : 0
+        const bPaid = (Number(b.amount_paid) || 0) > 0 ? 1 : 0
+        if (aPaid !== bPaid) return bPaid - aPaid
+
+        const aExp = a.expires_at ? new Date(a.expires_at).getTime() : 0
+        const bExp = b.expires_at ? new Date(b.expires_at).getTime() : 0
+        if (aExp !== bExp) return bExp - aExp
+
+        const aCreated = a.created_at ? new Date(a.created_at).getTime() : 0
+        const bCreated = b.created_at ? new Date(b.created_at).getTime() : 0
+        return bCreated - aCreated
+      })
+      consolidated.push(sorted[0])
+    }
+
+    return res.status(200).json(consolidated)
   } catch (err: any) {
     console.error('Error fetching subscriptions:', err)
     return res.status(500).json({ error: 'Internal Server Error' })
