@@ -646,6 +646,61 @@ export default function OrgDashboardPage() {
           )
         )}
 
+        {/* Paid Subscription Notice (if organization is on paid plan and expiring soon or expired) */}
+        {!trialInfo?.isTrial && trialInfo && (
+          trialInfo.isExpired ? (
+            <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-slate-900 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-700 flex items-center justify-center shrink-0">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-slate-900 mb-0.5 flex items-center gap-2">
+                    <span>Masa Aktif Langganan Telah Berakhir</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-200/60 text-rose-800 font-bold uppercase">Kadaluwarsa</span>
+                  </p>
+                  <p className="text-xs text-slate-600 font-normal">
+                    Masa langganan KitaAtur Plus organisasi ini telah habis. Perpanjang sekarang untuk membuka kembali seluruh akses fitur presensi & kas.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/upgrade"
+                className="px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold rounded-xl transition-all shrink-0 shadow-sm shadow-rose-600/20 active:scale-95"
+              >
+                Perpanjang Langganan
+              </Link>
+            </div>
+          ) : trialInfo.daysLeft !== null && trialInfo.daysLeft <= 3 ? (
+            <div className="mb-6 p-4 rounded-2xl bg-amber-50 border border-amber-200 text-slate-900 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="flex items-start sm:items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center shrink-0">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span className="text-xs font-bold text-slate-900">
+                      Langganan Akan Segera Berakhir
+                    </span>
+                    <span className="text-xs text-amber-800 font-bold bg-amber-200/60 px-2 py-0.5 rounded-full">
+                      Sisa {trialInfo.daysLeft === 0 ? `${trialInfo.hoursLeft} Jam` : `${trialInfo.daysLeft} Hari`} Lagi
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-600 font-normal">
+                    Masa aktif berakhir pada {new Date(trialInfo.expiresAt).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })}. Perpanjang sekarang agar operasional organisasi tetap lancar.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/upgrade"
+                className="px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-all shrink-0 shadow-sm shadow-amber-600/20 active:scale-95"
+              >
+                Perpanjang Sekarang
+              </Link>
+            </div>
+          ) : null
+        )}
+
         {/* Quick Onboarding Wizard for Organization Leaders */}
         {showOnboarding && !currentOrg?.is_edu && (currentUserRole === 'head' || currentUserRole === 'vice_head' || currentUserRole === 'bendahara') && (
           <QuickOnboardingWizard
