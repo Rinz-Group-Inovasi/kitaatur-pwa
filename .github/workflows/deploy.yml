@@ -15,12 +15,13 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           port: ${{ secrets.VPS_PORT }}
-          script: |
-            cd /var/www/kitaatur/backend-kitaatur/backend 2>/dev/null || cd /var/www/kitaatur/backend
+        script: |
+            set -e
+            cd /var/www/kitaatur/backend-kitaatur/backend
             git pull origin main
             npm install
             chmod -R +x node_modules/.bin
             npx prisma generate
             npm run build
-            pm2 restart kitaatur-backend || pm2 restart kitaatur
+            pm2 restart backend-kitaatur
 
