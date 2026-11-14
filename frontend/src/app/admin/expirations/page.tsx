@@ -47,6 +47,11 @@ interface OrgExpirationItem {
   is_expired: boolean
   subscription_id: string | null
   all_subscriptions_count: number
+  purchased_by_member?: {
+    email: string
+    name: string | null
+    role: string
+  } | null
 }
 
 export default function AdminExpirationsPage() {
@@ -555,6 +560,11 @@ export default function AdminExpirationsPage() {
                         <span>• Aktif Selamanya</span>
                       )}
                     </div>
+                    {item.purchased_by_member && (
+                      <div className="text-[10px] text-blue-600 font-medium md:text-right mt-0.5">
+                        Dibayar oleh {item.purchased_by_member.role}: {item.purchased_by_member.name || item.purchased_by_member.email}
+                      </div>
+                    )}
                   </div>
 
                   {/* Actions */}

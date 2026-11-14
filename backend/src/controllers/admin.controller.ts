@@ -40,6 +40,19 @@ export async function getAllOrgs(req: Request, res: Response) {
             }
           }
         },
+        organization_members: {
+          include: {
+            profile: {
+              include: {
+                subscriptions: {
+                  where: { status: 'active' },
+                  orderBy: { expires_at: 'desc' },
+                  take: 1
+                }
+              }
+            }
+          }
+        },
         _count: {
           select: {
             organization_members: true,
@@ -49,7 +62,26 @@ export async function getAllOrgs(req: Request, res: Response) {
       },
       orderBy: { created_at: 'desc' }
     })
-    return res.status(200).json(orgs)
+
+    const mappedOrgs = orgs.map(org => {
+      // If owner has no subscription, check if any member has an active subscription
+      if (!org.owner?.subscriptions?.length && org.organization_members?.length) {
+        for (const m of org.organization_members) {
+          if (m.profile?.subscriptions?.length) {
+            return {
+              ...org,
+              owner: {
+                ...org.owner,
+                subscriptions: m.profile.subscriptions
+              }
+            }
+          }
+        }
+      }
+      return org
+    })
+
+    return res.status(200).json(mappedOrgs)
   } catch (err) {
     console.error('Error fetching orgs:', err)
     return res.status(500).json({ error: 'Internal Server Error' })
@@ -158,6 +190,17 @@ export async function getOrgExpirationsAdmin(req: Request, res: Response) {
             }
           }
         },
+        organization_members: {
+          include: {
+            profile: {
+              include: {
+                subscriptions: {
+                  orderBy: { created_at: 'desc' }
+                }
+              }
+            }
+          }
+        },
         _count: {
           select: {
             organization_members: true,
@@ -174,9 +217,35 @@ export async function getOrgExpirationsAdmin(req: Request, res: Response) {
       const isSchool = org.is_edu || ((org._count?.school_links_as_school || 0) > 0)
       const owner = org.owner
 
-      // Prefer active subscription, or fallback to the latest created
-      const allSubs = owner?.subscriptions || []
-      const activeSub = allSubs.find((s) => s.status === 'active') || allSubs[0] || null
+      // Collect owner's subscriptions
+      const ownerSubs = owner?.subscriptions || []
+
+      // Also collect member subscriptions (if secretary/treasurer purchased for this org)
+      const memberSubs: any[] = []
+      if (org.organization_members) {
+        for (const m of org.organization_members) {
+          if (m.profile_id !== org.owner_id && m.profile?.subscriptions?.length) {
+            for (const s of m.profile.subscriptions) {
+              memberSubs.push({
+                ...s,
+                purchased_by_member: {
+                  email: m.profile.email,
+                  name: m.profile.full_name,
+                  role: m.role
+                }
+              })
+            }
+          }
+        }
+      }
+
+      const allSubs = [...ownerSubs, ...memberSubs]
+
+      // Prefer non-expired active sub, then any active sub, then latest created
+      const activeSub = allSubs.find((s) => s.status === 'active' && new Date(s.expires_at) >= now)
+        || allSubs.find((s) => s.status === 'active')
+        || allSubs[0]
+        || null
 
       let status = 'free'
       let planType = 'free'
@@ -187,7 +256,7 @@ export async function getOrgExpirationsAdmin(req: Request, res: Response) {
       let isExpired = false
       let subscriptionId: string | null = null
 
-      if (!owner) {
+      if (!owner && !activeSub) {
         status = 'no_owner'
         planType = isSchool ? 'school_admin' : 'free'
       } else if (activeSub) {
@@ -225,6 +294,7 @@ export async function getOrgExpirationsAdmin(req: Request, res: Response) {
         owner_id: org.owner_id,
         owner_name: owner?.full_name || null,
         owner_email: owner?.email || null,
+        purchased_by_member: (activeSub as any)?.purchased_by_member || null,
         members_count: org._count?.organization_members || 0,
         linked_schools_count: org._count?.school_links_as_school || 0,
         plan_type: planType,

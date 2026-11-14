@@ -1926,13 +1926,48 @@ export async function getOrgDashboardOverview(req: any, res: Response) {
       ? 'head'
       : (currentMember?.role || orgMemberContext.role || 'member');
 
-    // Cek informasi langganan / masa uji coba (trial) dari pemilik organisasi
+    // Cek informasi langganan / masa uji coba (trial) dari pemilik organisasi atau pengurus
     let trialInfo: any = null;
-    if (org?.owner_id && !isAdminUser) {
-      const ownerSub = await prisma.subscriptions.findFirst({
-        where: { profile_id: org.owner_id },
-        orderBy: { created_at: 'desc' }
-      });
+    if (org?.id && !isAdminUser) {
+      let ownerSub = null;
+      if (org.owner_id) {
+        ownerSub = await prisma.subscriptions.findFirst({
+          where: { profile_id: org.owner_id },
+          orderBy: { created_at: 'desc' }
+        });
+      }
+
+      // Fallback: cek jika ada pengurus/anggota organisasi yang memiliki langganan aktif
+      if (!ownerSub || ownerSub.status !== 'active' || new Date(ownerSub.expires_at) < now) {
+        const memberWithSub = await prisma.organization_members.findFirst({
+          where: {
+            organization_id: org.id,
+            profile: {
+              subscriptions: {
+                some: {
+                  status: 'active',
+                  expires_at: { gt: now }
+                }
+              }
+            }
+          },
+          include: {
+            profile: {
+              include: {
+                subscriptions: {
+                  where: { status: 'active', expires_at: { gt: now } },
+                  orderBy: { expires_at: 'desc' },
+                  take: 1
+                }
+              }
+            }
+          }
+        });
+
+        if (memberWithSub?.profile?.subscriptions?.[0]) {
+          ownerSub = memberWithSub.profile.subscriptions[0];
+        }
+      }
 
       if (ownerSub) {
         const isTrial = (ownerSub.plan_type || '').toLowerCase().includes('trial');
