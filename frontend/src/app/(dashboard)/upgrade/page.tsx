@@ -5,6 +5,7 @@ import { useState, useEffect } from 'react'
 import { api, supabase } from '@/lib/api'
 import toast from 'react-hot-toast'
 import { useRouter } from 'next/navigation'
+import { calculateSubscriptionPrice } from '@/lib/pricing'
 
 export default function UpgradePage() {
   const router = useRouter()
@@ -38,8 +39,8 @@ export default function UpgradePage() {
   const baseMonthly = isFamily ? 250000 : (isPro ? 110000 : 40000)
   const baseYearly = isFamily ? 2500000 : (isPro ? 1100000 : 400000)
   const baseAmount = billingCycle === 'yearly' ? baseYearly : baseMonthly
-  const tax = baseAmount * 0.11
-  const subtotalWithTax = baseAmount + tax
+  const discountAmount = appliedVoucher ? Number(appliedVoucher.discountAmount || 0) : 0
+  const pricing = calculateSubscriptionPrice(baseAmount, discountAmount)
 
   const handleSubscribeClick = (plan: 'plus' | 'pro' | 'family') => {
     if (!userId) return toast.error('Gagal mengambil data user.')
@@ -63,7 +64,7 @@ export default function UpgradePage() {
       const res = await api.post('/payment/validate-voucher', {
         code: voucherCodeInput.trim(),
         planType: `${selectedPlan}-${billingCycle}`,
-        baseAmount: subtotalWithTax
+        baseAmount: pricing.subtotalWithTax
       })
 
       setAppliedVoucher(res.data)
@@ -88,7 +89,7 @@ export default function UpgradePage() {
     try {
       const res = await api.post('/payment/checkout', {
         planType: `${selectedPlan}-${billingCycle}`,
-        amount: subtotalWithTax,
+        amount: pricing.subtotalWithTax,
         userId: userId,
         voucherCode: appliedVoucher?.voucher?.code || undefined
       })
@@ -341,19 +342,31 @@ export default function UpgradePage() {
                     Paket KitaAtur {selectedPlan === 'family' ? 'Family' : (selectedPlan === 'pro' ? 'School' : 'Plus')} ({billingCycle === 'monthly' ? 'Bulanan' : 'Tahunan'})
                   </span>
                   <span className="font-medium text-slate-900">
-                    Rp {Number(baseAmount).toLocaleString('id-ID')}
+                    Rp {Number(pricing.basePrice).toLocaleString('id-ID')}
                   </span>
                 </div>
                 <div className="flex justify-between text-slate-600">
                   <span>PPN (11%)</span>
                   <span className="font-medium text-slate-900">
-                    Rp {Number(tax).toLocaleString('id-ID')}
+                    Rp {Number(pricing.ppn).toLocaleString('id-ID')}
                   </span>
                 </div>
                 
-                <div className="flex justify-between text-slate-600 border-t border-slate-100 pt-2 font-medium">
+                <div className="flex justify-between text-slate-500 border-t border-slate-100 pt-2 text-xs">
                   <span>Subtotal</span>
-                  <span>Rp {Number(subtotalWithTax).toLocaleString('id-ID')}</span>
+                  <span className="font-semibold text-slate-800">Rp {Number(pricing.subtotalWithTax).toLocaleString('id-ID')}</span>
+                </div>
+
+                <div className="flex justify-between items-center text-slate-600">
+                  <span className="flex items-center gap-1.5">
+                    <span>Biaya Layanan (KitaPay)</span>
+                    <span className="text-[10px] px-1.5 py-0.2 bg-blue-50 text-[#0087FF] rounded font-semibold border border-blue-100">
+                      {pricing.feeTier === 'Tier 1' ? 'Tier 1: Flat Rp 1.500' : 'Tier 2: 1,5%'}
+                    </span>
+                  </span>
+                  <span className="font-medium text-slate-900">
+                    Rp {Number(pricing.paymentFee).toLocaleString('id-ID')}
+                  </span>
                 </div>
 
                 {appliedVoucher && (
@@ -363,18 +376,15 @@ export default function UpgradePage() {
                       Diskon Voucher ({appliedVoucher.voucher.code})
                     </span>
                     <span className="font-bold text-sm">
-                      - Rp {Number(appliedVoucher.discountAmount).toLocaleString('id-ID')}
+                      - Rp {Number(pricing.discountAmount).toLocaleString('id-ID')}
                     </span>
                   </div>
                 )}
 
                 <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
                   <span className="font-bold text-slate-900">Total Pembayaran</span>
-                  {appliedVoucher?.isFree ? (
+                  {pricing.isFree ? (
                     <div className="text-right">
-                      <span className="text-xs text-slate-400 line-through mr-2">
-                        Rp {Number(subtotalWithTax).toLocaleString('id-ID')}
-                      </span>
                       <span className="text-xl font-black text-emerald-600 inline-flex items-center gap-1">
                         <Sparkles className="w-4 h-4 fill-emerald-500 text-emerald-500" />
                         GRATIS
@@ -384,11 +394,11 @@ export default function UpgradePage() {
                     <div className="text-right">
                       {appliedVoucher && (
                         <span className="text-xs text-slate-400 line-through mr-2">
-                          Rp {Number(subtotalWithTax).toLocaleString('id-ID')}
+                          Rp {Number(pricing.subtotalWithTax + pricing.paymentFee).toLocaleString('id-ID')}
                         </span>
                       )}
                       <span className="text-xl font-bold text-[#0087FF]">
-                        Rp {Number(appliedVoucher ? appliedVoucher.finalAmount : subtotalWithTax).toLocaleString('id-ID')}
+                        Rp {Number(pricing.totalPayable).toLocaleString('id-ID')}
                       </span>
                     </div>
                   )}

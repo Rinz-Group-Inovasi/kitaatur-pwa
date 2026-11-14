@@ -24,6 +24,7 @@ import {
 import toast from 'react-hot-toast'
 import dayjs from 'dayjs'
 import 'dayjs/locale/id'
+import { calculateSubscriptionPrice } from '@/lib/pricing'
 
 interface SubscriptionItem {
   id: string
@@ -200,12 +201,13 @@ export default function GoogleStyleSubscriptionPage() {
     if (!renewModal.voucherCode.trim()) return
     setRenewModal(prev => ({ ...prev, voucherLoading: true }))
 
-    const basePrice = renewModal.planCycle === 'yearly' ? 444000 : 44400
+    const basePrice = renewModal.planCycle === 'yearly' ? 400000 : 40000
+    const pricing = calculateSubscriptionPrice(basePrice)
     try {
       const res = await api.post('/payment/validate-voucher', {
         code: renewModal.voucherCode.trim().toUpperCase(),
         planType: `plus-${renewModal.planCycle}`,
-        baseAmount: basePrice
+        baseAmount: pricing.subtotalWithTax
       })
       setRenewModal(prev => ({
         ...prev,
@@ -224,15 +226,14 @@ export default function GoogleStyleSubscriptionPage() {
     if (!user) return toast.error('Silakan login terlebih dahulu')
     setRenewModal(prev => ({ ...prev, loading: true }))
 
-    const basePrice = renewModal.planCycle === 'yearly' ? 444000 : 44400
-    const finalPrice = renewModal.appliedVoucher 
-      ? Number(renewModal.appliedVoucher.finalAmount) 
-      : basePrice
+    const basePrice = renewModal.planCycle === 'yearly' ? 400000 : 40000
+    const discountAmount = renewModal.appliedVoucher ? Number(renewModal.appliedVoucher.discountAmount || 0) : 0
+    const pricing = calculateSubscriptionPrice(basePrice, discountAmount)
 
     try {
       const res = await api.post('/payment/checkout', {
         planType: `plus-${renewModal.planCycle}`,
-        amount: basePrice,
+        amount: pricing.subtotalWithTax,
         userId: user.id,
         voucherCode: renewModal.appliedVoucher?.voucher?.code || undefined
       })
@@ -528,100 +529,139 @@ export default function GoogleStyleSubscriptionPage() {
             </div>
 
             {/* Modal Body */}
-            <div className="p-6 space-y-5">
-              {/* Cycle Toggle (Bulanan vs Tahunan) */}
-              <div>
-                <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-2">
-                  Pilih Periode Perpanjangan
-                </label>
-                <div className="grid grid-cols-2 gap-2.5 bg-slate-100 p-1 rounded-2xl">
-                  <button
-                    type="button"
-                    onClick={() => setRenewModal(prev => ({ ...prev, planCycle: 'monthly', appliedVoucher: null }))}
-                    className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
-                      renewModal.planCycle === 'monthly'
-                        ? 'bg-white text-slate-900 shadow-xs'
-                        : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    Bulanan (Rp 44.400)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRenewModal(prev => ({ ...prev, planCycle: 'yearly', appliedVoucher: null }))}
-                    className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
-                      renewModal.planCycle === 'yearly'
-                        ? 'bg-white text-slate-900 shadow-xs'
-                        : 'text-slate-500 hover:text-slate-900'
-                    }`}
-                  >
-                    <span>Tahunan</span>
-                    <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-black">
-                      Hemat
-                    </span>
-                  </button>
-                </div>
-              </div>
+            {(() => {
+              const currentBasePrice = renewModal.planCycle === 'yearly' ? 400000 : 40000
+              const currentDiscount = renewModal.appliedVoucher ? Number(renewModal.appliedVoucher.discountAmount || 0) : 0
+              const currentPricing = calculateSubscriptionPrice(currentBasePrice, currentDiscount)
 
-              {/* Price Details */}
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2">
-                <div className="flex items-center justify-between text-xs text-slate-600">
-                  <span>Harga Normal</span>
-                  <span>
-                    Rp {renewModal.planCycle === 'yearly' ? '444.000' : '44.400'}
-                  </span>
-                </div>
-
-                {renewModal.appliedVoucher && (
-                  <div className="flex items-center justify-between text-xs text-emerald-600 font-semibold">
-                    <span>Diskon Voucher ({renewModal.appliedVoucher.voucher.code})</span>
-                    <span>- Rp {Number(renewModal.appliedVoucher.discountAmount).toLocaleString('id-ID')}</span>
+              return (
+                <div className="p-6 space-y-5">
+                  {/* Cycle Toggle (Bulanan vs Tahunan) */}
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-2">
+                      Pilih Periode Perpanjangan
+                    </label>
+                    <div className="grid grid-cols-2 gap-2.5 bg-slate-100 p-1 rounded-2xl">
+                      <button
+                        type="button"
+                        onClick={() => setRenewModal(prev => ({ ...prev, planCycle: 'monthly', appliedVoucher: null }))}
+                        className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+                          renewModal.planCycle === 'monthly'
+                            ? 'bg-white text-slate-900 shadow-xs'
+                            : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                      >
+                        Bulanan (Rp 40.000/bln)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setRenewModal(prev => ({ ...prev, planCycle: 'yearly', appliedVoucher: null }))}
+                        className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                          renewModal.planCycle === 'yearly'
+                            ? 'bg-white text-slate-900 shadow-xs'
+                            : 'text-slate-500 hover:text-slate-900'
+                        }`}
+                      >
+                        <span>Tahunan</span>
+                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-black">
+                          Hemat 2 Bulan
+                        </span>
+                      </button>
+                    </div>
                   </div>
-                )}
 
-                <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-900">Total Pembayaran</span>
-                  <span className="text-lg font-black text-[#0087FF]">
-                    Rp {renewModal.appliedVoucher 
-                      ? Number(renewModal.appliedVoucher.finalAmount).toLocaleString('id-ID')
-                      : (renewModal.planCycle === 'yearly' ? '444.000' : '44.400')}
-                  </span>
-                </div>
-              </div>
+                  {/* Price Details Breakdown */}
+                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span>Harga Paket</span>
+                      <span className="font-medium text-slate-900">
+                        Rp {currentPricing.basePrice.toLocaleString('id-ID')}
+                      </span>
+                    </div>
 
-              {/* Voucher Input */}
-              <div>
-                <label className="text-xs font-bold text-slate-700 block mb-1.5">
-                  Punya Kode Voucher? (Opsional)
-                </label>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Ticket className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-                    <input
-                      type="text"
-                      placeholder="Contoh: MERDEKA50"
-                      value={renewModal.voucherCode}
-                      onChange={(e) => setRenewModal(prev => ({ ...prev, voucherCode: e.target.value.toUpperCase() }))}
-                      className="w-full pl-9 pr-3 py-2 text-xs uppercase font-mono font-bold bg-white border border-slate-200 rounded-xl focus:outline-hidden focus:border-blue-500"
-                    />
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span>PPN (11%)</span>
+                      <span className="font-medium text-slate-900">
+                        Rp {currentPricing.ppn.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-200/60 pt-1.5">
+                      <span>Subtotal</span>
+                      <span className="font-semibold text-slate-800">
+                        Rp {currentPricing.subtotalWithTax.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-slate-600">
+                      <span className="flex items-center gap-1.5">
+                        <span>Biaya Layanan (KitaPay)</span>
+                        <span className="text-[10px] px-1.5 py-0.2 bg-blue-50 text-[#0087FF] rounded font-semibold border border-blue-100">
+                          {currentPricing.feeTier === 'Tier 1' ? 'Tier 1: Flat Rp 1.500' : 'Tier 2: 1,5%'}
+                        </span>
+                      </span>
+                      <span className="font-medium text-slate-900">
+                        Rp {currentPricing.paymentFee.toLocaleString('id-ID')}
+                      </span>
+                    </div>
+
+                    {renewModal.appliedVoucher && (
+                      <div className="flex items-center justify-between text-xs text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
+                        <span className="flex items-center gap-1.5">
+                          <Ticket className="w-3.5 h-3.5" />
+                          Diskon Voucher ({renewModal.appliedVoucher.voucher.code})
+                        </span>
+                        <span>- Rp {Number(renewModal.appliedVoucher.discountAmount).toLocaleString('id-ID')}</span>
+                      </div>
+                    )}
+
+                    <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                      <span className="text-xs font-bold text-slate-900">Total Pembayaran</span>
+                      {currentPricing.isFree ? (
+                        <span className="text-lg font-black text-emerald-600">GRATIS</span>
+                      ) : (
+                        <span className="text-lg font-black text-[#0087FF]">
+                          Rp {currentPricing.totalPayable.toLocaleString('id-ID')}
+                        </span>
+                      )}
+                    </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={handleApplyVoucher}
-                    disabled={renewModal.voucherLoading || !renewModal.voucherCode.trim()}
-                    className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-bold transition shrink-0"
-                  >
-                    {renewModal.voucherLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Gunakan'}
-                  </button>
-                </div>
-              </div>
 
-              {/* Security notice */}
-              <div className="flex items-center gap-2 text-[11px] text-slate-400">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                <span>Pembayaran resmi & terenkripsi otomatis via QRIS KitaPay.</span>
-              </div>
-            </div>
+                  {/* Voucher Input */}
+                  <div>
+                    <label className="text-xs font-bold text-slate-700 block mb-1.5">
+                      Punya Kode Voucher? (Opsional)
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <div className="relative flex-1">
+                        <Ticket className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input
+                          type="text"
+                          placeholder="Contoh: MERDEKA50"
+                          value={renewModal.voucherCode}
+                          onChange={(e) => setRenewModal(prev => ({ ...prev, voucherCode: e.target.value.toUpperCase() }))}
+                          className="w-full pl-9 pr-3 py-2 text-xs uppercase font-mono font-bold bg-white border border-slate-200 rounded-xl focus:outline-hidden focus:border-blue-500"
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleApplyVoucher}
+                        disabled={renewModal.voucherLoading || !renewModal.voucherCode.trim()}
+                        className="px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 disabled:opacity-50 text-white text-xs font-bold transition shrink-0"
+                      >
+                        {renewModal.voucherLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Gunakan'}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Security notice */}
+                  <div className="flex items-center gap-2 text-[11px] text-slate-400">
+                    <ShieldCheck className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                    <span>Pembayaran resmi & terenkripsi otomatis via QRIS KitaPay.</span>
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* Modal Footer */}
             <div className="p-6 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-3">

@@ -105,43 +105,83 @@ export default function PaymentPage() {
               )}
             </div>
 
-            <div className="space-y-3 mb-8">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-500">Paket</span>
-                <span className="font-medium text-slate-900 capitalize">
-                  {sub.plan_type.includes('trial') ? 'KitaAtur Plus (Trial 7 Hari)' : sub.plan_type.replace('-', ' ')}
-                </span>
-              </div>
+            {(() => {
+              const isTrial = sub.plan_type?.includes('trial')
+              const totalAmount = Number(sub.amount_paid || 0)
+              const origAmount = Number(sub.original_amount || 0)
+              const discountAmt = Number(sub.discount_amount || 0)
 
-              {sub.voucher_code && Number(sub.discount_amount) > 0 && (
-                <>
-                  {sub.original_amount && (
-                    <div className="flex justify-between text-sm text-slate-600">
-                      <span>Harga Normal</span>
-                      <span className="line-through text-slate-400">
-                        Rp {Number(sub.original_amount).toLocaleString('id-ID')}
+              // Hitung rincian Harga Dasar, PPN 11%, dan Biaya Layanan Pembayaran KitaPay
+              const isYearly = (sub.plan_type || '').toLowerCase().includes('yearly')
+              const basePrice = origAmount > 0 
+                ? Math.round(origAmount / 1.11) 
+                : (isYearly ? 400000 : 40000)
+              const ppn = origAmount > 0 ? (origAmount - basePrice) : Math.round(basePrice * 0.11)
+              const subtotal = basePrice + ppn
+              const fee = totalAmount > 0 ? Math.max(0, totalAmount - (subtotal - discountAmt)) : 0
+
+              return (
+                <div className="space-y-3 mb-8">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-slate-500">Paket</span>
+                    <span className="font-medium text-slate-900 capitalize">
+                      {isTrial ? 'KitaAtur Plus (Trial 7 Hari)' : sub.plan_type.replace('-', ' ')}
+                    </span>
+                  </div>
+
+                  {!isTrial && totalAmount > 0 && (
+                    <>
+                      <div className="flex justify-between text-sm text-slate-600">
+                        <span>Harga Paket</span>
+                        <span className="font-medium text-slate-900">
+                          Rp {basePrice.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+
+                      <div className="flex justify-between text-sm text-slate-600">
+                        <span>PPN (11%)</span>
+                        <span className="font-medium text-slate-900">
+                          Rp {ppn.toLocaleString('id-ID')}
+                        </span>
+                      </div>
+
+                      {fee > 0 && (
+                        <div className="flex justify-between text-sm text-slate-600">
+                          <span className="flex items-center gap-1.5">
+                            <span>Biaya Layanan (KitaPay)</span>
+                            <span className="text-[10px] px-1.5 py-0.2 bg-blue-50 text-[#0087FF] rounded font-semibold border border-blue-100">
+                              {fee <= 1500 ? 'Tier 1' : 'Tier 2'}
+                            </span>
+                          </span>
+                          <span className="font-medium text-slate-900">
+                            Rp {fee.toLocaleString('id-ID')}
+                          </span>
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {sub.voucher_code && discountAmt > 0 && (
+                    <div className="flex justify-between text-sm text-emerald-600 font-medium bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
+                      <span className="flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5" />
+                        Voucher ({sub.voucher_code})
+                      </span>
+                      <span className="font-bold">
+                        - Rp {discountAmt.toLocaleString('id-ID')}
                       </span>
                     </div>
                   )}
-                  <div className="flex justify-between text-sm text-emerald-600 font-medium bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
-                    <span className="flex items-center gap-1.5">
-                      <Tag className="w-3.5 h-3.5" />
-                      Voucher ({sub.voucher_code})
-                    </span>
-                    <span className="font-bold">
-                      - Rp {Number(sub.discount_amount).toLocaleString('id-ID')}
+
+                  <div className="flex justify-between text-sm border-t border-slate-100 pt-3 items-center">
+                    <span className="text-slate-700 font-medium">Total Pembayaran</span>
+                    <span className="font-black text-[#0087FF] text-xl">
+                      {isTrial ? 'Rp 0 (Gratis Uji Coba)' : `Rp ${totalAmount.toLocaleString('id-ID')}`}
                     </span>
                   </div>
-                </>
-              )}
-
-              <div className="flex justify-between text-sm border-t border-slate-100 pt-2">
-                <span className="text-slate-500">Total Biaya</span>
-                <span className="font-bold text-slate-900 text-lg">
-                  {sub.plan_type.includes('trial') ? 'Rp 0 (Gratis Uji Coba)' : `Rp ${Number(sub.amount_paid).toLocaleString('id-ID')}`}
-                </span>
-              </div>
-            </div>
+                </div>
+              )
+            })()}
 
             {sub.status === 'unpaid' && sub.payment_url && (
               <div className="flex flex-col items-center w-full">

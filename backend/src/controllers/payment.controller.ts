@@ -123,6 +123,7 @@ export async function createCheckout(req: Request, res: Response) {
       body: JSON.stringify({
         merchantId,
         amount: Number(finalAmount),
+        chargeFeeToCustomer: true,
         externalId: robustOrderId,
         targetWebhookUrl,
         customerEmail: realEmail,
@@ -138,7 +139,11 @@ export async function createCheckout(req: Request, res: Response) {
       throw new Error('Gagal mendapatkan respon pembayaran dari KitaPay')
     }
 
-    const { transactionId, qrisString: qrString } = result
+    const { transactionId, qrisString: qrString, amount: resultAmount } = result
+
+    // Biaya Layanan KitaPay resmi: <= 100k: Rp 1.500 flat, > 100k: 1.5% (Math.ceil(amount / 0.985) - amount)
+    const expectedFee = finalAmount <= 100000 ? 1500 : Math.ceil(finalAmount / 0.985) - finalAmount
+    const chargedAmount = Number(resultAmount || (finalAmount + expectedFee))
 
     const createdSub = await prisma.$queryRawUnsafe<any[]>(
       `
@@ -160,7 +165,7 @@ export async function createCheckout(req: Request, res: Response) {
       userId,
       transactionId,
       planType,
-      Number(finalAmount),
+      chargedAmount,
       subscriptionExpiry,
       qrString || '',
       appliedVoucher?.code || null,
@@ -181,7 +186,9 @@ export async function createCheckout(req: Request, res: Response) {
       orderId: robustOrderId,
       subscriptionId: createdSub[0]?.id,
       discountAmount,
-      finalAmount
+      subtotalAmount: finalAmount,
+      paymentFee: chargedAmount - finalAmount,
+      finalAmount: chargedAmount
     })
 
   } catch (err: any) {
