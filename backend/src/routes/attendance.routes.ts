@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.middleware'
 import { requireOrgRole } from '../middleware/role.middleware'
+import { requireActiveOrgSubscription } from '../middleware/subscription.middleware'
 import {
   createSession,
   getActiveSession,
@@ -42,10 +43,10 @@ router.get('/:orgIdOrSlug/pending-collaborations', requireOrgRole(['head', 'sekr
 router.post('/:orgIdOrSlug/sessions/:sessionId/collaborate/accept', requireOrgRole(['head', 'sekretaris']), acceptCollaboration)
 router.post('/:orgIdOrSlug/sessions/:sessionId/collaborate/reject', requireOrgRole(['head', 'sekretaris']), rejectCollaboration)
 
-// Buka sesi absensi baru terjadwal (Head & Sekretaris)
-router.post('/:orgIdOrSlug/sessions', requireOrgRole(['head', 'sekretaris']), createSession)
+// Buka sesi absensi baru terjadwal (Head & Sekretaris - Wajib Langganan Aktif)
+router.post('/:orgIdOrSlug/sessions', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, createSession)
 
-// Ambil daftar semua sesi absensi (Semua Anggota untuk keperluan filter riwayat)
+// Ambil daftar semua sesi absensi (Semua Anggota untuk keperluan filter riwayat - READ-ONLY BISA DIAKSES)
 router.get('/:orgIdOrSlug/sessions', requireOrgRole(['head', 'bendahara', 'sekretaris', 'member', 'auditor']), getSessions)
 
 // Ambil sesi absensi yang sedang aktif (Semua Anggota)
@@ -53,7 +54,6 @@ router.get('/:orgIdOrSlug/sessions/active', requireOrgRole(['head', 'bendahara',
 
 // Ambil anggota yang valid untuk suatu sesi (Bantu Absen)
 router.get('/:orgIdOrSlug/sessions/:sessionId/members', requireOrgRole(['head', 'bendahara', 'sekretaris', 'member', 'auditor']), getSessionMembers)
-
 
 // Ambil active/upcoming agenda untuk Member
 router.get('/:orgIdOrSlug/agenda', requireOrgRole(['head', 'bendahara', 'sekretaris', 'member', 'auditor']), getAgenda)
@@ -67,16 +67,16 @@ router.put('/:orgIdOrSlug/sessions/:sessionId/close', requireOrgRole(['head', 's
 // Hapus sesi absensi / agenda lampau/salah buat (Head, Vice Head & Sekretaris)
 router.delete('/:orgIdOrSlug/sessions/:sessionId', requireOrgRole(['head', 'vice_head', 'sekretaris']), deleteSession)
 
-// Manual Bulk Check-in (Untuk Head/Sekretaris/Delegasi)
-router.post('/:orgIdOrSlug/sessions/:sessionId/manual-checkin', requireOrgRole(['head', 'sekretaris', 'member']), manualBulkCheckIn)
+// Manual Bulk Check-in (Untuk Head/Sekretaris/Delegasi - Wajib Langganan Aktif)
+router.post('/:orgIdOrSlug/sessions/:sessionId/manual-checkin', requireOrgRole(['head', 'sekretaris', 'member']), requireActiveOrgSubscription, manualBulkCheckIn)
 
 
 // ========================
-// Member Check-in
+// Member Check-in (Wajib Langganan Aktif)
 // ========================
 
-// Check-in dengan PIN dan GPS (Semua Anggota)
-router.post('/:orgIdOrSlug/scan', requireOrgRole(['head', 'bendahara', 'sekretaris', 'member']), checkIn)
+// Check-in dengan PIN dan GPS (Semua Anggota - Wajib Langganan Aktif)
+router.post('/:orgIdOrSlug/scan', requireOrgRole(['head', 'bendahara', 'sekretaris', 'member']), requireActiveOrgSubscription, checkIn)
 
 
 // ========================
@@ -85,16 +85,16 @@ router.post('/:orgIdOrSlug/scan', requireOrgRole(['head', 'bendahara', 'sekretar
 import { getGuests, uploadGuests, scanGuestQR, getGuestStats, getGuestAnalytics } from '../controllers/attendance.controller'
 
 router.get('/:orgIdOrSlug/guests', requireOrgRole(['head', 'sekretaris', 'member']), getGuests)
-router.post('/:orgIdOrSlug/guests', requireOrgRole(['head', 'sekretaris']), uploadGuests)
+router.post('/:orgIdOrSlug/guests', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, uploadGuests)
 router.get('/:orgIdOrSlug/guests/analytics', requireOrgRole(['head', 'sekretaris', 'member']), getGuestAnalytics)
-router.post('/:orgIdOrSlug/sessions/:sessionId/guests/scan', requireOrgRole(['head', 'sekretaris']), scanGuestQR)
-router.post('/:orgIdOrSlug/sessions/:sessionId/members/scan', requireOrgRole(['head', 'sekretaris']), scanGuestQR)
-router.post('/:orgIdOrSlug/sessions/:sessionId/scan', requireOrgRole(['head', 'sekretaris']), scanGuestQR)
+router.post('/:orgIdOrSlug/sessions/:sessionId/guests/scan', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, scanGuestQR)
+router.post('/:orgIdOrSlug/sessions/:sessionId/members/scan', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, scanGuestQR)
+router.post('/:orgIdOrSlug/sessions/:sessionId/scan', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, scanGuestQR)
 router.get('/:orgIdOrSlug/sessions/:sessionId/guests/stats', requireOrgRole(['head', 'sekretaris', 'member']), getGuestStats)
 
 
 // ========================
-// Stats & History
+// Stats & History (READ-ONLY TETAP BISA DIAKSES SAAT KADALUWARSA)
 // ========================
 
 // Ambil statistik absensi untuk Dashboard Sekretaris
@@ -118,7 +118,7 @@ router.put('/:orgIdOrSlug/attendance/:attendanceId/validate', requireOrgRole(['h
 // ========================
 // AI Analysis
 // ========================
-router.post('/:orgIdOrSlug/ai-insight', requireOrgRole(['head', 'vice_head', 'sekretaris']), generateAttendanceInsight)
-router.post('/:orgIdOrSlug/validate-proof', requireOrgRole(['head', 'vice_head', 'sekretaris']), validateProofWithAI)
+router.post('/:orgIdOrSlug/ai-insight', requireOrgRole(['head', 'vice_head', 'sekretaris']), requireActiveOrgSubscription, generateAttendanceInsight)
+router.post('/:orgIdOrSlug/validate-proof', requireOrgRole(['head', 'vice_head', 'sekretaris']), requireActiveOrgSubscription, validateProofWithAI)
 
 export default router

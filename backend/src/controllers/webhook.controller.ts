@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from '../config/db'
 import { Prisma, user_global_role } from '@prisma/client'
+import { clearSubCache } from '../middleware/subscription.middleware'
 
 export async function handleKitapayWebhook(req: Request, res: Response) {
   const payload = req.body
@@ -68,6 +69,9 @@ export async function handleKitapayWebhook(req: Request, res: Response) {
           }
         })
       })
+
+      // Invalidate subscription cache instantly
+      clearSubCache()
 
       return res.status(200).json({ success: true })
     } catch (err: any) {

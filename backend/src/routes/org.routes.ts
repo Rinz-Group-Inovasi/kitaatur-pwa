@@ -1,6 +1,7 @@
 import { Router } from 'express'
 import { requireAuth } from '../middleware/auth.middleware'
 import { requireOrgRole } from '../middleware/role.middleware'
+import { requireActiveOrgSubscription } from '../middleware/subscription.middleware'
 import {
   antiJoinRateLimiter,
   antiMemberManageRateLimiter,
@@ -75,14 +76,14 @@ router.put('/:orgIdOrSlug', requireOrgRole(['head']), updateOrganization)
 // B. Mendapatkan seluruh anggota organisasi (Semua role dalam org bersangkutan)
 router.get('/:orgIdOrSlug/members', requireOrgRole(['head', 'bendahara', 'sekretaris', 'member', 'auditor']), getOrganizationMembers)
 
-// C. Menambahkan anggota baru ke dalam organisasi (Hanya Head organisasi & rate limited)
-router.post('/:orgIdOrSlug/members', antiMemberManageRateLimiter, requireOrgRole(['head']), addOrganizationMember)
+// C. Menambahkan anggota baru ke dalam organisasi (Hanya Head organisasi & wajib langganan aktif)
+router.post('/:orgIdOrSlug/members', antiMemberManageRateLimiter, requireOrgRole(['head']), requireActiveOrgSubscription, addOrganizationMember)
 
 // C2. Mendapatkan Invite Code Organisasi
 router.get('/:orgIdOrSlug/invite-code', requireOrgRole(['head', 'sekretaris']), getInviteCode)
 
 // C3. Mereset Invite Code Organisasi
-router.post('/:orgIdOrSlug/invite-code/reset', requireOrgRole(['head', 'sekretaris']), resetInviteCode)
+router.post('/:orgIdOrSlug/invite-code/reset', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, resetInviteCode)
 
 // D. Mengubah role anggota organisasi (Hanya Head organisasi & rate limited)
 router.patch('/:orgIdOrSlug/members/:memberProfileId', antiMemberManageRateLimiter, requireOrgRole(['head']), updateMemberRole)
@@ -90,23 +91,23 @@ router.patch('/:orgIdOrSlug/members/:memberProfileId', antiMemberManageRateLimit
 // D2. Mengeluarkan anggota dari organisasi (Hanya Head organisasi & rate limited)
 router.delete('/:orgIdOrSlug/members/:memberProfileId', antiMemberManageRateLimiter, requireOrgRole(['head']), removeOrganizationMember)
 
-// E. Mendapatkan goals/target organisasi
+// E. Mendapatkan goals/target organisasi (READ-ONLY TETAP BISA DIAKSES SAAT KADALUWARSA)
 router.get('/:orgIdOrSlug/goals', requireOrgRole(['head', 'bendahara', 'sekretaris', 'member', 'auditor']), getOrgGoals)
 
-// E2. Buat Target/Anggaran Baru (Hanya Bendahara)
-router.post('/:orgIdOrSlug/goals', requireOrgRole(['bendahara']), createOrgGoal)
+// E2. Buat Target/Anggaran Baru (Hanya Bendahara & wajib langganan aktif)
+router.post('/:orgIdOrSlug/goals', requireOrgRole(['bendahara']), requireActiveOrgSubscription, createOrgGoal)
 
-// E3. Tambah Saldo Target (Hanya Bendahara)
-router.post('/:orgIdOrSlug/goals/:goalId/progress', requireOrgRole(['bendahara']), addGoalProgress)
+// E3. Tambah Saldo Target (Hanya Bendahara & wajib langganan aktif)
+router.post('/:orgIdOrSlug/goals/:goalId/progress', requireOrgRole(['bendahara']), requireActiveOrgSubscription, addGoalProgress)
 
-// E4. Ambil Riwayat Target (Semua Anggota)
+// E4. Ambil Riwayat Target (Semua Anggota - READ-ONLY)
 router.get('/:orgIdOrSlug/goals/:goalId/transactions', requireOrgRole(['head', 'bendahara', 'sekretaris', 'member', 'auditor']), getGoalTransactions)
 
-// E5. Kelola Dana Target (Pengeluaran, Pindah Kas, Pindah Target) (Hanya Bendahara)
-router.post('/:orgIdOrSlug/goals/:goalId/manage', requireOrgRole(['bendahara']), manageGoalFunds)
+// E5. Kelola Dana Target (Pengeluaran, Pindah Kas, Pindah Target) (Hanya Bendahara & wajib langganan aktif)
+router.post('/:orgIdOrSlug/goals/:goalId/manage', requireOrgRole(['bendahara']), requireActiveOrgSubscription, manageGoalFunds)
 
-// E6. Hapus Target (Hanya Bendahara)
-router.delete('/:orgIdOrSlug/goals/:goalId', requireOrgRole(['bendahara']), deleteOrgGoal)
+// E6. Hapus Target (Hanya Bendahara & wajib langganan aktif)
+router.delete('/:orgIdOrSlug/goals/:goalId', requireOrgRole(['bendahara']), requireActiveOrgSubscription, deleteOrgGoal)
 
 // F. Pengaturan Organisasi
 

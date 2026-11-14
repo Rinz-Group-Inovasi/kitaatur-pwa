@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from '../config/db'
 import { isDisposableEmail, getClientIp, checkIpTrialLimit } from '../utils/antiAbuse'
+import { clearSubCache } from '../middleware/subscription.middleware'
 
 /**
  * Cek status eligibility & status trial user saat ini
@@ -203,6 +204,8 @@ export async function claimTrial(req: Request, res: Response) {
 
       return { claim, sub }
     })
+
+    clearSubCache()
 
     return res.status(201).json({
       success: true,

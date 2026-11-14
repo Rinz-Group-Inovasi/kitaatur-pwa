@@ -217,8 +217,16 @@ export default function OrgTransactionForm({ orgSlug, onSuccess }: OrgTransactio
         </div>
 
         {error && (
-          <div className="text-rose-400 bg-rose-500/10 border border-rose-500/20 px-4 py-2.5 rounded-lg text-sm">
-            {error}
+          <div className="text-rose-600 bg-rose-50 border border-rose-200 px-4 py-3 rounded-xl text-xs font-semibold flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+            <span>{error}</span>
+            {error.toLowerCase().includes('langganan') && (
+              <a
+                href="/upgrade"
+                className="px-3 py-1.5 rounded-lg bg-rose-600 text-white font-bold text-xs hover:bg-rose-700 transition shrink-0"
+              >
+                Perpanjang Langganan
+              </a>
+            )}
           </div>
         )}
 

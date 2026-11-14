@@ -1,6 +1,7 @@
 import { Request, Response } from 'express'
 import { prisma } from '../config/db'
 import { sendBroadcastWebPush } from './notification.controller'
+import { clearSubCache } from '../middleware/subscription.middleware'
 
 // 1. Get System Stats
 export async function getSystemStats(req: Request, res: Response) {
@@ -392,6 +393,8 @@ export async function setOrgExpirationAdmin(req: Request, res: Response) {
         amount_paid: 0
       }
     })
+
+    clearSubCache(org_id)
 
     return res.status(200).json({
       success: true,

@@ -657,10 +657,10 @@ export default function OrgDashboardPage() {
                 <div>
                   <p className="text-xs font-bold text-slate-900 mb-0.5 flex items-center gap-2">
                     <span>Masa Aktif Langganan Telah Berakhir</span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-200/60 text-rose-800 font-bold uppercase">Kadaluwarsa</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-rose-200/70 text-rose-800 font-bold uppercase">Mode Read-Only</span>
                   </p>
-                  <p className="text-xs text-slate-600 font-normal">
-                    Masa langganan KitaAtur Plus organisasi ini telah habis. Perpanjang sekarang untuk membuka kembali seluruh akses fitur presensi & kas.
+                  <p className="text-xs text-slate-600 font-normal leading-relaxed">
+                    Masa langganan organisasi ini telah habis. Anda tetap dapat meninjau seluruh data kas, presensi, dan anggota (hanya lihat), namun pencatatan data baru dan pembukaan sesi presensi dikunci.
                   </p>
                 </div>
               </div>
