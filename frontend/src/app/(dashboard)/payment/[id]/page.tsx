@@ -117,7 +117,8 @@ export default function PaymentPage() {
                 : (isYearly ? 400000 : 40000)
               const discountAmt = Math.min(Number(sub.discount_amount || 0), basePrice)
               const discountedBasePrice = Math.max(0, basePrice - discountAmt)
-              const ppn = origAmount > 0 ? (origAmount - basePrice) : Math.round(basePrice * 0.11)
+              // PPN 11% mengikuti hitungan dasar dari harga paket (setelah dipotong diskon)
+              const ppn = Math.round(discountedBasePrice * 0.11)
               const netSubtotal = discountedBasePrice + ppn
               const fee = totalAmount > 0 ? Math.max(0, totalAmount - netSubtotal) : 0
 

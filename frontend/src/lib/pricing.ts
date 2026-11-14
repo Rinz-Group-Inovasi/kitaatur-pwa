@@ -1,8 +1,8 @@
 /**
  * Perhitungan Biaya Langganan & Biaya Layanan Pembayaran KitaPay
  * Sesuai Ketentuan Bisnis & Dokumentasi Resmi KitaPay:
- * - Voucher HANYA mendiskon Harga Dasar paket (tidak mendiskon PPN maupun Layanan KitaPay)
- * - PPN: 11% dari harga dasar paket (tetap ada dan tidak didiskon oleh voucher)
+ * - Voucher HANYA mendiskon Harga Dasar paket (tidak mendiskon Layanan KitaPay)
+ * - PPN 11% mengikuti hitungan dasar dari harga paket (setelah dipotong diskon / DPP)
  * - Biaya Layanan Pembayaran KitaPay (chargeFeeToCustomer):
  *   * Tier 1 (Nominal <= Rp 100.000): Rp 1.500 (Flat)
  *   * Tier 2 (Nominal > Rp 100.000): 1,5% transaksi (formula: Math.ceil(amount / 0.985) - amount)
@@ -29,8 +29,8 @@ export function calculateSubscriptionPrice(
   const discountAmount = Math.min(Math.max(0, Math.round(rawDiscount)), basePrice)
   const discountedBasePrice = Math.max(0, basePrice - discountAmount)
 
-  // 2. PPN 11% dihitung dari harga dasar paket dan TIDAK didiskon oleh voucher
-  const ppn = Math.round(basePrice * 0.11)
+  // 2. PPN 11% mengikuti hitungan dasar dari harga paket (setelah dipotong diskon)
+  const ppn = Math.round(discountedBasePrice * 0.11)
 
   // 3. Subtotal bersih yang harus dibayar sebelum biaya layanan (Harga dasar terdiskon + PPN)
   const netSubtotal = discountedBasePrice + ppn

@@ -24,9 +24,6 @@ export async function createCheckout(req: Request, res: Response) {
       }
     }
 
-    // PPN 11% selalu dihitung dari harga dasar paket dan TIDAK didiskon oleh voucher
-    const ppn = Math.round(basePrice * 0.11)
-
     let discountAmount = 0
     let appliedVoucher: any = null
 
@@ -66,10 +63,13 @@ export async function createCheckout(req: Request, res: Response) {
       }
     }
 
-    // Harga dasar setelah diskon voucher
+    // Harga dasar setelah diskon voucher (Dasar Pengenaan Pajak)
     const discountedBasePrice = Math.max(0, basePrice - discountAmount)
 
-    // Subtotal bersih yang ditagihkan: Harga dasar setelah diskon + PPN 11% (PPN tidak didiskon!)
+    // PPN 11% mengikuti hitungan dasar dari harga paket (setelah dipotong diskon)
+    const ppn = Math.round(discountedBasePrice * 0.11)
+
+    // Subtotal bersih yang ditagihkan: Harga dasar setelah diskon + PPN 11%
     const netSubtotal = discountedBasePrice + ppn
 
     const durationDays = isYearly ? 365 : 30
