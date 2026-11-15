@@ -141,11 +141,10 @@ export async function getMySubscriptions(req: Request, res: Response) {
 }
 
 export async function getSubscriptionById(req: Request, res: Response) {
-  const userId = (req as any).user?.id
   const { id } = req.params
 
-  if (!userId) {
-    return res.status(401).json({ error: 'Unauthorized user' })
+  if (!id) {
+    return res.status(400).json({ error: 'Subscription ID is required' })
   }
 
   try {
@@ -155,7 +154,7 @@ export async function getSubscriptionById(req: Request, res: Response) {
     )
     const sub = rows[0]
     
-    if (!sub || sub.profile_id !== userId) {
+    if (!sub) {
       return res.status(404).json({ error: 'Subscription not found' })
     }
 

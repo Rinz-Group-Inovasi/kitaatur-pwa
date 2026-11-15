@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { api } from '@/lib/api'
 import Link from 'next/link'
-import { ArrowLeft, CheckCircle2, Clock, ExternalLink, Tag } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Clock, ExternalLink, Tag, XCircle } from 'lucide-react'
 import { QRCodeSVG } from 'qrcode.react'
 
 export default function PaymentPage() {
@@ -13,43 +13,66 @@ export default function PaymentPage() {
   const [loading, setLoading] = useState(true)
   const [timeLeft, setTimeLeft] = useState<string>('')
 
-  useEffect(() => {
-    const fetchSub = async () => {
-      try {
-        const res = await api.get(`/subscription/${id}`)
-        setSub(res.data)
-      } catch (err) {
-        console.error(err)
-      } finally {
-        setLoading(false)
-      }
+  const fetchSub = async () => {
+    if (!id) return
+    try {
+      const res = await api.get(`/subscription/${id}`)
+      setSub(res.data)
+    } catch (err) {
+      console.error('Error fetching subscription:', err)
+    } finally {
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
     fetchSub()
   }, [id])
 
+  // Polling status secara otomatis setiap 3.5 detik jika status masih unpaid
   useEffect(() => {
-    if (!sub || sub.status !== 'unpaid' || !sub.expires_at) return
+    if (!sub || sub.status !== 'unpaid' || !id) return
 
-    const interval = setInterval(() => {
-      const now = new Date().getTime()
-      const expiry = new Date(sub.expires_at).getTime()
-      const distance = expiry - now
+    const pollInterval = setInterval(async () => {
+      try {
+        const res = await api.get(`/subscription/${id}`)
+        if (res.data && res.data.status !== 'unpaid') {
+          setSub(res.data)
+        }
+      } catch (err) {
+        // Ignore background polling errors
+      }
+    }, 3500)
 
-      if (distance < 0) {
+    return () => clearInterval(pollInterval)
+  }, [sub?.status, id])
+
+  // Countdown timer sisa waktu pembayaran QRIS (30 menit sejak dibuat)
+  useEffect(() => {
+    if (!sub || sub.status !== 'unpaid') return
+
+    const createdTime = sub.created_at ? new Date(sub.created_at).getTime() : Date.now()
+    const expiryTime = createdTime + 30 * 60 * 1000
+
+    const updateTimer = () => {
+      const now = Date.now()
+      const distance = expiryTime - now
+
+      if (distance <= 0) {
         setTimeLeft('Kedaluwarsa')
-        clearInterval(interval)
         return
       }
 
-      const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-      const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60))
+      const minutes = Math.floor(distance / (1000 * 60))
       const seconds = Math.floor((distance % (1000 * 60)) / 1000)
+      setTimeLeft(`${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`)
+    }
 
-      setTimeLeft(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`)
-    }, 1000)
-
+    updateTimer()
+    const interval = setInterval(updateTimer, 1000)
     return () => clearInterval(interval)
-  }, [sub])
+  }, [sub?.status, sub?.created_at])
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-50 flex flex-col items-center pt-12 p-6 animate-pulse">
@@ -70,7 +93,25 @@ export default function PaymentPage() {
   }
 
   if (!sub) {
-    return <div className="p-10 text-center text-red-500">Tagihan tidak ditemukan.</div>
+    return (
+      <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-full max-w-md bg-white rounded-3xl p-8 border border-slate-200 shadow-sm flex flex-col items-center">
+          <div className="w-14 h-14 rounded-full bg-red-50 text-red-500 flex items-center justify-center mb-4">
+            <XCircle className="w-7 h-7" />
+          </div>
+          <h2 className="text-lg font-bold text-slate-900 mb-1">Tagihan Tidak Ditemukan</h2>
+          <p className="text-xs text-slate-500 mb-6 leading-relaxed max-w-xs">
+            Data tagihan pembayaran ini mungkin sudah kedaluwarsa atau ID transaksi tidak sesuai.
+          </p>
+          <Link
+            href="/personal/settings/subscription"
+            className="w-full py-2.5 px-4 rounded-xl font-bold text-xs text-white bg-[#0087FF] hover:bg-[#0077E6] transition text-center shadow-sm"
+          >
+            Kembali ke Langganan
+          </Link>
+        </div>
+      </div>
+    )
   }
 
   return (
