@@ -148,19 +148,30 @@ export async function getSubscriptionById(req: Request, res: Response) {
   }
 
   try {
-    const rows: any[] = await prisma.$queryRawUnsafe(
-      `SELECT * FROM public.subscriptions WHERE id = $1 LIMIT 1`,
-      id
-    )
-    const sub = rows[0]
+    let sub: any = await prisma.subscriptions.findUnique({
+      where: { id }
+    })
+
+    if (!sub) {
+      const rows: any[] = await prisma.$queryRawUnsafe(
+        `SELECT * FROM public.subscriptions WHERE id = $1::uuid LIMIT 1`,
+        id
+      )
+      sub = rows[0]
+    }
     
     if (!sub) {
       return res.status(404).json({ error: 'Subscription not found' })
     }
 
-    return res.status(200).json(sub)
+    return res.status(200).json({
+      ...sub,
+      amount_paid: sub.amount_paid != null ? Number(sub.amount_paid) : 0,
+      original_amount: sub.original_amount != null ? Number(sub.original_amount) : 0,
+      discount_amount: sub.discount_amount != null ? Number(sub.discount_amount) : 0
+    })
   } catch (err: any) {
-    console.error('Error fetching subscription:', err)
+    console.error('Error fetching subscription:', err?.message || err)
     return res.status(500).json({ error: 'Internal Server Error' })
   }
 }
