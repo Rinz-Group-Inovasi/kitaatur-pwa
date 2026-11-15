@@ -3,7 +3,7 @@ import toast from 'react-hot-toast'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import Link from 'next/link'
-import { Search, Building2, Crown, Trash2, ShieldCheck, ArrowRight, X, GraduationCap, Link2, Unlink, CheckSquare, Square, Loader2, Sparkles, Plus, Clock } from 'lucide-react'
+import { Search, Building2, Crown, Trash2, ShieldCheck, ArrowRight, X, GraduationCap, Link2, Unlink, CheckSquare, Square, Loader2, Sparkles, Plus, Clock, Users } from 'lucide-react'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import { useAdminRoute } from '../useAdminRoute'
 
@@ -360,7 +360,17 @@ export default function AdminOrgsPage() {
                           {linkedCount} Ekskul Ditautkan
                         </span>
                       )}
-                      {latestSub ? (
+                      {org.parent?.family_code ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-black bg-blue-50 text-[#0087FF] border border-blue-200 font-mono">
+                          <Users className="w-3 h-3 text-[#0087FF]" />
+                          <span>{org.parent.family_code}</span>
+                        </span>
+                      ) : org.family_code ? (
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-black bg-blue-50 text-[#0087FF] border border-blue-200 font-mono">
+                          <Users className="w-3 h-3 text-[#0087FF]" />
+                          <span>{org.family_code}</span>
+                        </span>
+                      ) : latestSub ? (
                         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold ${
                           isSubExpired
                             ? 'bg-rose-50 text-rose-700 border border-rose-200'

@@ -33,6 +33,14 @@ export async function getAllOrgs(req: Request, res: Response) {
   try {
     const orgs = await prisma.organizations.findMany({
       include: {
+        parent: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            family_code: true
+          }
+        },
         owner: {
           include: {
             subscriptions: {
@@ -184,6 +192,29 @@ export async function getOrgExpirationsAdmin(req: Request, res: Response) {
   try {
     const orgs = await prisma.organizations.findMany({
       include: {
+        parent: {
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            family_code: true,
+            owner: {
+              include: {
+                subscriptions: {
+                  where: { status: 'active' },
+                  orderBy: { created_at: 'desc' }
+                }
+              }
+            }
+          }
+        },
+        children: {
+          select: {
+            id: true,
+            name: true,
+            slug: true
+          }
+        },
         owner: {
           include: {
             subscriptions: {
@@ -284,6 +315,32 @@ export async function getOrgExpirationsAdmin(req: Request, res: Response) {
         planType = isSchool ? 'school_free' : 'personal_free'
       }
 
+      // Check Family Link details (Branch linked to Parent with family_code OR Induk with family_code)
+      const isFamilyBranch = Boolean(org.parent_id && org.parent)
+      const parentFamilyCode = org.parent?.family_code || null
+      const selfFamilyCode = org.family_code || null
+      const familyCode = parentFamilyCode || selfFamilyCode || null
+      const isLinkedFamily = Boolean(isFamilyBranch && parentFamilyCode)
+
+      // If this org is a branch linked to Induk Family, inherit Induk's active status
+      if (isLinkedFamily && org.parent?.owner?.subscriptions) {
+        const parentActiveSub = org.parent.owner.subscriptions.find(
+          (s: any) => s.status === 'active' && new Date(s.expires_at) >= now
+        )
+
+        if (parentActiveSub) {
+          status = 'active'
+          planType = parentActiveSub.plan_type || 'family'
+          startsAt = parentActiveSub.starts_at
+          expiresAt = parentActiveSub.expires_at
+          const expDate = new Date(parentActiveSub.expires_at)
+          const diffMs = expDate.getTime() - now.getTime()
+          daysLeft = Math.ceil(diffMs / (1000 * 60 * 60 * 24))
+          hoursLeft = Math.ceil(diffMs / (1000 * 60 * 60))
+          isExpired = false
+        }
+      }
+
       return {
         id: org.id,
         name: org.name,
@@ -306,7 +363,13 @@ export async function getOrgExpirationsAdmin(req: Request, res: Response) {
         hours_left: hoursLeft,
         is_expired: isExpired,
         subscription_id: subscriptionId,
-        all_subscriptions_count: allSubs.length
+        all_subscriptions_count: allSubs.length,
+        // Family Link fields
+        is_linked_family: isLinkedFamily,
+        family_code: familyCode,
+        parent_id: org.parent_id || null,
+        parent_name: org.parent?.name || null,
+        parent_slug: org.parent?.slug || null
       }
     })
 

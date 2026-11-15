@@ -19,7 +19,8 @@ import {
   GraduationCap,
   ExternalLink,
   ChevronRight,
-  Filter
+  Filter,
+  Users
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { api } from '@/lib/api'
@@ -52,6 +53,11 @@ interface OrgExpirationItem {
     name: string | null
     role: string
   } | null
+  is_linked_family?: boolean
+  family_code?: string | null
+  parent_id?: string | null
+  parent_name?: string | null
+  parent_slug?: string | null
 }
 
 export default function AdminExpirationsPage() {
@@ -172,7 +178,8 @@ export default function AdminExpirationsPage() {
       item.name.toLowerCase().includes(q) ||
       item.slug.toLowerCase().includes(q) ||
       (item.owner_name && item.owner_name.toLowerCase().includes(q)) ||
-      (item.owner_email && item.owner_email.toLowerCase().includes(q))
+      (item.owner_email && item.owner_email.toLowerCase().includes(q)) ||
+      (item.family_code && item.family_code.toLowerCase().includes(q))
 
     if (!matchesSearch) return false
 
@@ -529,7 +536,12 @@ export default function AdminExpirationsPage() {
                   {/* Status Indicator Pill */}
                   <div className="text-left md:text-right">
                     <div className="flex items-center md:justify-end gap-1.5 mb-1">
-                      {isExpSoon ? (
+                      {item.is_linked_family && item.family_code ? (
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black bg-blue-50 text-[#0087FF] border border-blue-200 shadow-2xs font-mono tracking-wide">
+                          <Users className="w-3.5 h-3.5 text-[#0087FF]" />
+                          <span>{item.family_code}</span>
+                        </span>
+                      ) : isExpSoon ? (
                         <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 shadow-2xs">
                           <Clock className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
                           <span>Sisa {item.days_left} Hari Lagi</span>
@@ -553,11 +565,20 @@ export default function AdminExpirationsPage() {
                     </div>
 
                     <div className="text-[11px] text-slate-400 font-medium flex items-center md:justify-end gap-2">
-                      <span className="font-semibold text-slate-600">{formatPlanName(item.plan_type)}</span>
-                      {item.expires_at ? (
-                        <span>• s/d {formatDate(item.expires_at)}</span>
+                      {item.is_linked_family ? (
+                        <span className="font-semibold text-blue-600">
+                          Cabang Family · {item.parent_name ? `Induk: ${item.parent_name}` : 'Mengikuti Induk'}
+                          {item.expires_at && ` • s/d ${formatDate(item.expires_at)}`}
+                        </span>
                       ) : (
-                        <span>• Aktif Selamanya</span>
+                        <>
+                          <span className="font-semibold text-slate-600">{formatPlanName(item.plan_type)}</span>
+                          {item.expires_at ? (
+                            <span>• s/d {formatDate(item.expires_at)}</span>
+                          ) : (
+                            <span>• Aktif Selamanya</span>
+                          )}
+                        </>
                       )}
                     </div>
                     {item.purchased_by_member && (
