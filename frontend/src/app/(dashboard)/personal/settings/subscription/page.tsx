@@ -536,12 +536,12 @@ export default function GoogleStyleSubscriptionPage() {
 
       {/* RENEWAL / EXTENSION MODAL (Google Styled Dialog) */}
       {renewModal.isOpen && renewModal.sub && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-md rounded-3xl border border-slate-200 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-md max-h-[92vh] sm:max-h-[88vh] rounded-3xl border border-slate-200 shadow-2xl overflow-hidden flex flex-col my-auto animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
-            <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
+            <div className="px-5 sm:px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-white">
+              <div className="min-w-0 pr-2">
+                <h3 className="text-base font-bold text-slate-900 truncate">
                   Perpanjang {getPlanCategoryLabel(renewModal.planCategory)}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">
@@ -550,13 +550,13 @@ export default function GoogleStyleSubscriptionPage() {
               </div>
               <button
                 onClick={() => setRenewModal(prev => ({ ...prev, isOpen: false }))}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {/* Modal Body */}
+            {/* Modal Body (Scrollable if height exceeds viewport) */}
             {(() => {
               const monthlyPrice = getPlanPrice(renewModal.planCategory, 'monthly')
               const yearlyPrice = getPlanPrice(renewModal.planCategory, 'yearly')
@@ -565,15 +565,15 @@ export default function GoogleStyleSubscriptionPage() {
               const currentPricing = calculateSubscriptionPrice(currentBasePrice, currentDiscount)
 
               return (
-                <div className="p-6 space-y-5">
+                <div className="p-4 sm:p-6 space-y-4 overflow-y-auto flex-1 overscroll-contain">
                   {/* Plan Category Selector (Auto-detected from previous sub) */}
                   <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500 shrink-0">
                         Paket Langganan
                       </label>
-                      <span className="text-[11px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
-                        Terdeteksi dari Sebelumnya
+                      <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100 shrink-0 whitespace-nowrap">
+                        Terdeteksi Otomatis
                       </span>
                     </div>
                     <div className="grid grid-cols-3 gap-2 bg-slate-100 p-1 rounded-2xl">
@@ -599,95 +599,103 @@ export default function GoogleStyleSubscriptionPage() {
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-2">
                       Pilih Periode Perpanjangan
                     </label>
-                    <div className="grid grid-cols-2 gap-2.5 bg-slate-100 p-1 rounded-2xl">
+                    <div className="grid grid-cols-2 gap-2 bg-slate-100 p-1 rounded-2xl">
                       <button
                         type="button"
                         onClick={() => setRenewModal(prev => ({ ...prev, planCycle: 'monthly', appliedVoucher: null }))}
-                        className={`py-2.5 rounded-xl text-xs font-bold transition-all ${
+                        className={`py-2 px-2 rounded-xl text-center transition-all ${
                           renewModal.planCycle === 'monthly'
-                            ? 'bg-white text-slate-900 shadow-xs'
-                            : 'text-slate-500 hover:text-slate-900'
+                            ? 'bg-white text-slate-900 shadow-xs font-bold'
+                            : 'text-slate-500 hover:text-slate-900 font-medium'
                         }`}
                       >
-                        Bulanan (Rp {monthlyPrice.toLocaleString('id-ID')}/bln)
+                        <div className="text-xs font-bold leading-tight">Bulanan</div>
+                        <div className="text-[11px] text-slate-500 font-medium mt-0.5 leading-tight">
+                          Rp {monthlyPrice.toLocaleString('id-ID')}/bln
+                        </div>
                       </button>
                       <button
                         type="button"
                         onClick={() => setRenewModal(prev => ({ ...prev, planCycle: 'yearly', appliedVoucher: null }))}
-                        className={`py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                        className={`py-2 px-2 rounded-xl text-center transition-all ${
                           renewModal.planCycle === 'yearly'
-                            ? 'bg-white text-slate-900 shadow-xs'
-                            : 'text-slate-500 hover:text-slate-900'
+                            ? 'bg-white text-slate-900 shadow-xs font-bold'
+                            : 'text-slate-500 hover:text-slate-900 font-medium'
                         }`}
                       >
-                        <span>Tahunan</span>
-                        <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.2 rounded font-black">
-                          Hemat 2 Bulan
-                        </span>
+                        <div className="text-xs font-bold leading-tight flex items-center justify-center gap-1">
+                          <span>Tahunan</span>
+                          <span className="text-[9px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-black leading-none">
+                            Hemat 2 Bln
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 font-medium mt-0.5 leading-tight">
+                          Rp {yearlyPrice.toLocaleString('id-ID')}/thn
+                        </div>
                       </button>
                     </div>
                   </div>
 
                   {/* Price Details Breakdown */}
-                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2">
-                    <div className="flex items-center justify-between text-xs text-slate-600">
-                      <span>Harga Paket ({getPlanCategoryLabel(renewModal.planCategory)})</span>
-                      <span className="font-medium text-slate-900">
+                  <div className="bg-slate-50 rounded-2xl p-3.5 sm:p-4 border border-slate-100 space-y-2 text-xs">
+                    <div className="flex items-center justify-between gap-2 text-slate-600">
+                      <span className="truncate">Harga Paket ({getPlanCategoryLabel(renewModal.planCategory)})</span>
+                      <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
                         Rp {currentPricing.basePrice.toLocaleString('id-ID')}
                       </span>
                     </div>
 
                     {renewModal.appliedVoucher && (
-                      <div className="flex items-center justify-between text-xs text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
-                        <span className="flex items-center gap-1.5">
-                          <Ticket className="w-3.5 h-3.5" />
-                          Diskon Voucher ({renewModal.appliedVoucher.voucher.code})
+                      <div className="flex items-center justify-between gap-2 text-emerald-600 font-semibold bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-100">
+                        <span className="flex items-center gap-1.5 truncate">
+                          <Ticket className="w-3.5 h-3.5 shrink-0" />
+                          <span className="truncate">Diskon ({renewModal.appliedVoucher.voucher.code})</span>
                         </span>
-                        <span>- Rp {currentPricing.discountAmount.toLocaleString('id-ID')}</span>
+                        <span className="shrink-0 whitespace-nowrap">- Rp {currentPricing.discountAmount.toLocaleString('id-ID')}</span>
                       </div>
                     )}
 
                     {renewModal.appliedVoucher && currentPricing.discountAmount > 0 && (
-                      <div className="flex items-center justify-between text-xs text-slate-600">
-                        <span>Harga Paket Setelah Diskon</span>
-                        <span className="font-semibold text-slate-900">
+                      <div className="flex items-center justify-between gap-2 text-slate-600">
+                        <span className="truncate">Harga Setelah Diskon</span>
+                        <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
                           Rp {currentPricing.discountedBasePrice.toLocaleString('id-ID')}
                         </span>
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between text-xs text-slate-600">
+                    <div className="flex items-center justify-between gap-2 text-slate-600">
                       <span>PPN (11%)</span>
-                      <span className="font-medium text-slate-900">
+                      <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
                         Rp {currentPricing.ppn.toLocaleString('id-ID')}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs text-slate-500 border-t border-slate-200/60 pt-1.5">
+                    <div className="flex items-center justify-between gap-2 text-slate-500 border-t border-slate-200/60 pt-1.5">
                       <span>Subtotal</span>
-                      <span className="font-semibold text-slate-800">
+                      <span className="font-bold text-slate-800 shrink-0 whitespace-nowrap">
                         Rp {currentPricing.netSubtotal.toLocaleString('id-ID')}
                       </span>
                     </div>
 
-                    <div className="flex items-center justify-between text-xs text-slate-600">
-                      <span className="flex items-center gap-1.5">
-                        <span>Biaya Layanan (KitaPay)</span>
-                        <span className="text-[10px] px-1.5 py-0.2 bg-blue-50 text-[#0087FF] rounded font-semibold border border-blue-100">
-                          {currentPricing.feeTier === 'Tier 1' ? 'Tier 1: Flat Rp 1.500' : 'Tier 2: 1,5%'}
+                    <div className="flex items-center justify-between gap-2 text-slate-600">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="truncate">Biaya Layanan (KitaPay)</span>
+                        <span className="text-[9px] px-1.5 py-0.5 bg-blue-50 text-[#0087FF] rounded font-semibold border border-blue-100 shrink-0 whitespace-nowrap">
+                          {currentPricing.feeTier === 'Tier 1' ? 'Flat' : '1.5%'}
                         </span>
-                      </span>
-                      <span className="font-medium text-slate-900">
+                      </div>
+                      <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
                         Rp {currentPricing.paymentFee.toLocaleString('id-ID')}
                       </span>
                     </div>
 
-                    <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between">
+                    <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
                       <span className="text-xs font-bold text-slate-900">Total Pembayaran</span>
                       {currentPricing.isFree ? (
-                        <span className="text-lg font-black text-emerald-600">GRATIS</span>
+                        <span className="text-base sm:text-lg font-black text-emerald-600 shrink-0">GRATIS</span>
                       ) : (
-                        <span className="text-lg font-black text-[#0087FF]">
+                        <span className="text-base sm:text-lg font-black text-[#0087FF] shrink-0 whitespace-nowrap">
                           Rp {currentPricing.totalPayable.toLocaleString('id-ID')}
                         </span>
                       )}
@@ -731,11 +739,11 @@ export default function GoogleStyleSubscriptionPage() {
             })()}
 
             {/* Modal Footer */}
-            <div className="p-6 bg-slate-50/80 border-t border-slate-100 flex items-center justify-end gap-3">
+            <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setRenewModal(prev => ({ ...prev, isOpen: false }))}
-                className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200/60 transition"
+                className="px-4 py-2.5 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-200/60 transition"
               >
                 Batal
               </button>

@@ -327,82 +327,84 @@ export default function UpgradePage() {
 
       {/* Confirmation Modal */}
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between p-6 border-b border-slate-100">
-              <h3 className="font-bold text-lg text-slate-900">Rincian Pembayaran</h3>
-              <button onClick={() => !loading && setShowModal(false)} className="text-slate-400 hover:text-slate-600">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-3 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md max-h-[92vh] sm:max-h-[88vh] overflow-hidden flex flex-col my-auto animate-in zoom-in-95 duration-200 border border-slate-200">
+            <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-slate-100 shrink-0 bg-white">
+              <h3 className="font-bold text-base sm:text-lg text-slate-900">Rincian Pembayaran</h3>
+              <button onClick={() => !loading && setShowModal(false)} className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="p-6">
+            <div className="p-5 sm:p-6 overflow-y-auto flex-1 overscroll-contain">
               <div className="space-y-3 text-sm mb-5">
-                <div className="flex justify-between text-slate-600">
-                  <span>
+                <div className="flex justify-between items-center gap-2 text-slate-600">
+                  <span className="truncate">
                     Paket KitaAtur {selectedPlan === 'family' ? 'Family' : (selectedPlan === 'pro' ? 'School' : 'Plus')} ({billingCycle === 'monthly' ? 'Bulanan' : 'Tahunan'})
                   </span>
-                  <span className="font-medium text-slate-900">
+                  <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
                     Rp {Number(pricing.basePrice).toLocaleString('id-ID')}
                   </span>
                 </div>
 
                 {appliedVoucher && (
-                  <div className="flex justify-between items-center text-emerald-600 font-medium bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">
-                    <span className="flex items-center gap-1.5 text-xs">
-                      <Tag className="w-3.5 h-3.5" />
-                      Diskon Voucher ({appliedVoucher.voucher.code})
+                  <div className="flex justify-between items-center gap-2 text-emerald-600 font-medium bg-emerald-50 px-3 py-2 rounded-lg border border-emerald-100">
+                    <span className="flex items-center gap-1.5 text-xs truncate">
+                      <Tag className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate">Diskon Voucher ({appliedVoucher.voucher.code})</span>
                     </span>
-                    <span className="font-bold text-sm">
+                    <span className="font-bold text-sm shrink-0 whitespace-nowrap">
                       - Rp {Number(pricing.discountAmount).toLocaleString('id-ID')}
                     </span>
                   </div>
                 )}
 
                 {appliedVoucher && pricing.discountAmount > 0 && (
-                  <div className="flex justify-between text-slate-600 text-xs">
-                    <span>Harga Paket Setelah Diskon</span>
-                    <span className="font-semibold text-slate-900">
+                  <div className="flex justify-between items-center gap-2 text-slate-600 text-xs">
+                    <span className="truncate">Harga Paket Setelah Diskon</span>
+                    <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
                       Rp {Number(pricing.discountedBasePrice).toLocaleString('id-ID')}
                     </span>
                   </div>
                 )}
 
-                <div className="flex justify-between text-slate-600">
+                <div className="flex justify-between items-center gap-2 text-slate-600">
                   <span>PPN (11%)</span>
-                  <span className="font-medium text-slate-900">
+                  <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
                     Rp {Number(pricing.ppn).toLocaleString('id-ID')}
                   </span>
                 </div>
                 
-                <div className="flex justify-between text-slate-500 border-t border-slate-100 pt-2 text-xs">
+                <div className="flex justify-between items-center gap-2 text-slate-500 border-t border-slate-100 pt-2 text-xs">
                   <span>Subtotal</span>
-                  <span className="font-semibold text-slate-800">Rp {Number(pricing.netSubtotal).toLocaleString('id-ID')}</span>
+                  <span className="font-bold text-slate-800 shrink-0 whitespace-nowrap">
+                    Rp {Number(pricing.netSubtotal).toLocaleString('id-ID')}
+                  </span>
                 </div>
 
-                <div className="flex justify-between items-center text-slate-600">
-                  <span className="flex items-center gap-1.5">
-                    <span>Biaya Layanan (KitaPay)</span>
-                    <span className="text-[10px] px-1.5 py-0.2 bg-blue-50 text-[#0087FF] rounded font-semibold border border-blue-100">
-                      {pricing.feeTier === 'Tier 1' ? 'Tier 1: Flat Rp 1.500' : 'Tier 2: 1,5%'}
+                <div className="flex justify-between items-center gap-2 text-slate-600">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="truncate">Biaya Layanan (KitaPay)</span>
+                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-50 text-[#0087FF] rounded font-semibold border border-blue-100 shrink-0 whitespace-nowrap">
+                      {pricing.feeTier === 'Tier 1' ? 'Flat' : '1.5%'}
                     </span>
-                  </span>
-                  <span className="font-medium text-slate-900">
+                  </div>
+                  <span className="font-semibold text-slate-900 shrink-0 whitespace-nowrap">
                     Rp {Number(pricing.paymentFee).toLocaleString('id-ID')}
                   </span>
                 </div>
 
-                <div className="pt-3 border-t border-slate-100 flex justify-between items-center">
+                <div className="pt-3 border-t border-slate-100 flex justify-between items-center gap-2">
                   <span className="font-bold text-slate-900">Total Pembayaran</span>
                   {pricing.isFree ? (
-                    <div className="text-right">
+                    <div className="text-right shrink-0">
                       <span className="text-xl font-black text-emerald-600 inline-flex items-center gap-1">
                         <Sparkles className="w-4 h-4 fill-emerald-500 text-emerald-500" />
                         GRATIS
                       </span>
                     </div>
                   ) : (
-                    <div className="text-right">
+                    <div className="text-right shrink-0 whitespace-nowrap">
                       <span className="text-xl font-bold text-[#0087FF]">
                         Rp {Number(pricing.totalPayable).toLocaleString('id-ID')}
                       </span>
@@ -412,7 +414,7 @@ export default function UpgradePage() {
               </div>
 
               {/* Voucher Section */}
-              <div className="mb-6 p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
+              <div className="mb-4 p-3 bg-slate-50 border border-slate-200/80 rounded-xl">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
                     <Ticket className="w-3.5 h-3.5 text-[#0087FF]" />
@@ -448,7 +450,7 @@ export default function UpgradePage() {
                         type="button"
                         onClick={handleApplyVoucher}
                         disabled={voucherLoading || !voucherCodeInput.trim()}
-                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5"
+                        className="px-4 py-2 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 text-white rounded-lg text-xs font-bold transition-colors flex items-center gap-1.5 shrink-0"
                       >
                         {voucherLoading ? (
                           <>
@@ -466,30 +468,30 @@ export default function UpgradePage() {
                   </div>
                 ) : (
                   <div className="flex items-center justify-between bg-white p-2.5 rounded-lg border border-emerald-200 shadow-sm">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-600 flex items-center justify-center font-bold shrink-0">
                         <CheckCircle2 className="w-4 h-4" />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-mono font-bold text-xs text-slate-900 tracking-wider">
                             {appliedVoucher.voucher.code}
                           </span>
-                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded">
+                          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-1.5 py-0.5 rounded shrink-0">
                             {appliedVoucher.voucher.discount_type === 'percentage' 
                               ? `Diskon ${appliedVoucher.voucher.discount_value}%` 
                               : `Potongan Rp ${Number(appliedVoucher.voucher.discount_value).toLocaleString('id-ID')}`}
                           </span>
                         </div>
                         {appliedVoucher.voucher.description && (
-                          <p className="text-[11px] text-slate-500 line-clamp-1">{appliedVoucher.voucher.description}</p>
+                          <p className="text-[11px] text-slate-500 truncate">{appliedVoucher.voucher.description}</p>
                         )}
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={handleRemoveVoucher}
-                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors shrink-0"
                       title="Hapus voucher"
                     >
                       <X className="w-4 h-4" />
@@ -499,34 +501,34 @@ export default function UpgradePage() {
               </div>
 
               {appliedVoucher?.isFree ? (
-                <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs p-3 rounded-lg mb-6 leading-relaxed font-medium flex items-start gap-2">
-                  <Sparkles className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+                <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs p-3 rounded-xl leading-relaxed font-medium flex items-start gap-2">
+                  <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
                   <span>
                     Voucher ini memberikan diskon 100%! Anda tidak perlu membayar, langganan akan langsung diaktifkan sekarang.
                   </span>
                 </div>
               ) : (
-                <div className="bg-[#E0F4FE] text-[#007AE6] text-xs p-3 rounded-lg mb-6 leading-relaxed font-medium">
+                <div className="bg-[#E0F4FE] text-[#007AE6] text-xs p-3 rounded-xl leading-relaxed font-medium">
                   Anda akan dialihkan ke payment gateway aman (KitaPay) untuk menyelesaikan pembayaran.
                 </div>
               )}
+            </div>
 
-              <div className="flex gap-3">
-                <button 
-                  onClick={() => setShowModal(false)}
-                  disabled={loading}
-                  className="flex-1 py-2.5 px-4 rounded-xl font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors disabled:opacity-70"
-                >
-                  Batal
-                </button>
-                <button 
-                  onClick={confirmSubscription}
-                  disabled={loading}
-                  className={`flex-1 py-2.5 px-4 rounded-xl font-medium text-white transition-colors disabled:opacity-70 flex items-center justify-center gap-2 ${appliedVoucher?.isFree ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#0087FF] hover:bg-[#0077E6]'}`}
-                >
-                  {loading ? 'Memproses...' : appliedVoucher?.isFree ? 'Aktifkan Sekarang' : 'Lanjut Bayar'}
-                </button>
-              </div>
+            <div className="p-4 sm:p-5 bg-slate-50 border-t border-slate-100 flex gap-3 shrink-0">
+              <button 
+                onClick={() => setShowModal(false)}
+                disabled={loading}
+                className="flex-1 py-2.5 px-4 rounded-xl font-bold text-xs text-slate-600 bg-slate-200/70 hover:bg-slate-200 transition-colors disabled:opacity-70"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={confirmSubscription}
+                disabled={loading}
+                className={`flex-1 py-2.5 px-4 rounded-xl font-bold text-xs text-white transition-colors disabled:opacity-70 flex items-center justify-center gap-2 shadow-sm ${appliedVoucher?.isFree ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-[#0087FF] hover:bg-[#0077E6]'}`}
+              >
+                {loading ? 'Memproses...' : appliedVoucher?.isFree ? 'Aktifkan Sekarang' : 'Lanjut Bayar'}
+              </button>
             </div>
           </div>
         </div>
