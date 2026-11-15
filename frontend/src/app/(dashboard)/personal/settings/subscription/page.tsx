@@ -53,6 +53,7 @@ export default function GoogleStyleSubscriptionPage() {
   const [renewModal, setRenewModal] = useState<{
     isOpen: boolean
     sub: SubscriptionItem | null
+    planCategory: 'plus' | 'pro' | 'family'
     planCycle: 'monthly' | 'yearly'
     loading: boolean
     voucherCode: string
@@ -62,6 +63,7 @@ export default function GoogleStyleSubscriptionPage() {
   }>({
     isOpen: false,
     sub: null,
+    planCategory: 'plus',
     planCycle: 'monthly',
     loading: false,
     voucherCode: '',
@@ -182,13 +184,39 @@ export default function GoogleStyleSubscriptionPage() {
     return 'Langganan Bulanan'
   }
 
-  // Open renewal modal
+  // Helper to detect plan category & billing cycle from existing subscription
+  const detectPlanDetails = (rawPlanType?: string | null): { category: 'plus' | 'pro' | 'family', cycle: 'monthly' | 'yearly' } => {
+    const raw = (rawPlanType || '').toLowerCase()
+    let category: 'plus' | 'pro' | 'family' = 'plus'
+    if (raw.includes('family')) {
+      category = 'family'
+    } else if (raw.includes('pro') || raw.includes('school') || raw.includes('enterprise')) {
+      category = 'pro'
+    }
+    const cycle: 'monthly' | 'yearly' = raw.includes('yearly') ? 'yearly' : 'monthly'
+    return { category, cycle }
+  }
+
+  const getPlanPrice = (category: 'plus' | 'pro' | 'family', cycle: 'monthly' | 'yearly') => {
+    if (category === 'family') return cycle === 'yearly' ? 2500000 : 250000
+    if (category === 'pro') return cycle === 'yearly' ? 1100000 : 110000
+    return cycle === 'yearly' ? 400000 : 40000
+  }
+
+  const getPlanCategoryLabel = (category: 'plus' | 'pro' | 'family') => {
+    if (category === 'family') return 'KitaAtur Family'
+    if (category === 'pro') return 'KitaAtur Pro'
+    return 'KitaAtur Plus'
+  }
+
+  // Open renewal modal - auto detects previous plan & cycle
   const handleOpenRenew = (sub: SubscriptionItem) => {
-    const isYearly = (sub.plan_type || '').toLowerCase().includes('yearly')
+    const { category, cycle } = detectPlanDetails(sub.plan_type)
     setRenewModal({
       isOpen: true,
       sub,
-      planCycle: isYearly ? 'yearly' : 'monthly',
+      planCategory: category,
+      planCycle: cycle,
       loading: false,
       voucherCode: '',
       voucherLoading: false,
@@ -201,11 +229,11 @@ export default function GoogleStyleSubscriptionPage() {
     if (!renewModal.voucherCode.trim()) return
     setRenewModal(prev => ({ ...prev, voucherLoading: true }))
 
-    const basePrice = renewModal.planCycle === 'yearly' ? 400000 : 40000
+    const basePrice = getPlanPrice(renewModal.planCategory, renewModal.planCycle)
     try {
       const res = await api.post('/payment/validate-voucher', {
         code: renewModal.voucherCode.trim().toUpperCase(),
-        planType: `plus-${renewModal.planCycle}`,
+        planType: `${renewModal.planCategory}-${renewModal.planCycle}`,
         baseAmount: basePrice
       })
       setRenewModal(prev => ({
@@ -225,13 +253,13 @@ export default function GoogleStyleSubscriptionPage() {
     if (!user) return toast.error('Silakan login terlebih dahulu')
     setRenewModal(prev => ({ ...prev, loading: true }))
 
-    const basePrice = renewModal.planCycle === 'yearly' ? 400000 : 40000
+    const basePrice = getPlanPrice(renewModal.planCategory, renewModal.planCycle)
     const discountAmount = renewModal.appliedVoucher ? Number(renewModal.appliedVoucher.discountAmount || 0) : 0
     const pricing = calculateSubscriptionPrice(basePrice, discountAmount)
 
     try {
       const res = await api.post('/payment/checkout', {
-        planType: `plus-${renewModal.planCycle}`,
+        planType: `${renewModal.planCategory}-${renewModal.planCycle}`,
         baseAmount: basePrice,
         amount: pricing.netSubtotal,
         userId: user.id,
@@ -514,7 +542,7 @@ export default function GoogleStyleSubscriptionPage() {
             <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between">
               <div>
                 <h3 className="text-base font-bold text-slate-900">
-                  Perpanjang Langganan
+                  Perpanjang {getPlanCategoryLabel(renewModal.planCategory)}
                 </h3>
                 <p className="text-xs text-slate-500 mt-0.5 truncate max-w-xs">
                   {getPlanDisplayName(renewModal.sub)}
@@ -530,12 +558,42 @@ export default function GoogleStyleSubscriptionPage() {
 
             {/* Modal Body */}
             {(() => {
-              const currentBasePrice = renewModal.planCycle === 'yearly' ? 400000 : 40000
+              const monthlyPrice = getPlanPrice(renewModal.planCategory, 'monthly')
+              const yearlyPrice = getPlanPrice(renewModal.planCategory, 'yearly')
+              const currentBasePrice = getPlanPrice(renewModal.planCategory, renewModal.planCycle)
               const currentDiscount = renewModal.appliedVoucher ? Number(renewModal.appliedVoucher.discountAmount || 0) : 0
               const currentPricing = calculateSubscriptionPrice(currentBasePrice, currentDiscount)
 
               return (
                 <div className="p-6 space-y-5">
+                  {/* Plan Category Selector (Auto-detected from previous sub) */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                        Paket Langganan
+                      </label>
+                      <span className="text-[11px] text-blue-600 font-semibold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-100">
+                        Terdeteksi dari Sebelumnya
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 bg-slate-100 p-1 rounded-2xl">
+                      {(['plus', 'pro', 'family'] as const).map((cat) => (
+                        <button
+                          key={cat}
+                          type="button"
+                          onClick={() => setRenewModal(prev => ({ ...prev, planCategory: cat, appliedVoucher: null }))}
+                          className={`py-2 px-1 rounded-xl text-xs font-bold transition-all text-center ${
+                            renewModal.planCategory === cat
+                              ? 'bg-white text-blue-600 shadow-xs'
+                              : 'text-slate-500 hover:text-slate-900'
+                          }`}
+                        >
+                          {cat === 'plus' ? 'Plus' : cat === 'pro' ? 'Pro' : 'Family'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Cycle Toggle (Bulanan vs Tahunan) */}
                   <div>
                     <label className="text-xs font-bold uppercase tracking-wider text-slate-500 block mb-2">
@@ -551,7 +609,7 @@ export default function GoogleStyleSubscriptionPage() {
                             : 'text-slate-500 hover:text-slate-900'
                         }`}
                       >
-                        Bulanan (Rp 40.000/bln)
+                        Bulanan (Rp {monthlyPrice.toLocaleString('id-ID')}/bln)
                       </button>
                       <button
                         type="button"
@@ -573,7 +631,7 @@ export default function GoogleStyleSubscriptionPage() {
                   {/* Price Details Breakdown */}
                   <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100 space-y-2">
                     <div className="flex items-center justify-between text-xs text-slate-600">
-                      <span>Harga Paket</span>
+                      <span>Harga Paket ({getPlanCategoryLabel(renewModal.planCategory)})</span>
                       <span className="font-medium text-slate-900">
                         Rp {currentPricing.basePrice.toLocaleString('id-ID')}
                       </span>
