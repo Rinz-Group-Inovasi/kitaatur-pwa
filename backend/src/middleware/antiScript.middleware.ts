@@ -90,21 +90,32 @@ export function antiScriptHoneypot(req: Request, res: Response, next: NextFuncti
   next()
 }
 
-// 3. Rate Limiter Khusus: Anti Brute-Force Invite Code & Pendaftaran Anggota
-export const antiJoinRateLimiter = rateLimit({
+// 3A. Rate Limiter Khusus: Pemeriksaan Link Invite (Akses Publik Preview Organisasi)
+export const antiInviteCheckRateLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 menit
-  max: 6, // Maksimal 6x percobaan bergabung atau cek invite per IP per 15 menit
+  max: 600, // Maksimal 600x akses per IP per 15 menit (aman untuk puluhan/ratusan siswa dalam 1 Wi-Fi sekolah)
   standardHeaders: true,
   legacyHeaders: false,
   message: {
-    error: 'Terlalu banyak permintaan bergabung atau pemeriksaan kode invite. Mohon tunggu 15 menit.'
+    error: 'Terlalu banyak permintaan pemeriksaan link invite dari jaringan ini. Mohon coba beberapa saat lagi.'
+  }
+})
+
+// 3B. Rate Limiter Khusus: Pendaftaran Anggota via Invite Code
+export const antiJoinRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 menit
+  max: 120, // Maksimal 120x pendaftaran anggota per IP per 15 menit
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Batas frekuensi pendaftaran anggota tercapai. Mohon tunggu beberapa saat.'
   }
 })
 
 // 4. Rate Limiter Khusus: Pengelolaan Anggota (Anti Script Spam Add/Role/Kick)
 export const antiMemberManageRateLimiter = rateLimit({
   windowMs: 10 * 60 * 1000, // 10 menit
-  max: 30, // Maksimal 30 request mutasi member per 10 menit
+  max: 150, // Maksimal 150 request mutasi member per 10 menit
   standardHeaders: true,
   legacyHeaders: false,
   message: {

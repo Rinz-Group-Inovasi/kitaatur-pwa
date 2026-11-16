@@ -3,6 +3,7 @@ import { requireAuth } from '../middleware/auth.middleware'
 import { requireOrgRole } from '../middleware/role.middleware'
 import { requireActiveOrgSubscription } from '../middleware/subscription.middleware'
 import {
+  antiInviteCheckRateLimiter,
   antiJoinRateLimiter,
   antiMemberManageRateLimiter,
   antiScriptHoneypot
@@ -49,8 +50,8 @@ import {
 
 const router = Router()
 
-// Public Route: Mengambil info org dari kode invite (tanpa auth, dilindungi antiJoinRateLimiter)
-router.get('/invite/:code', antiJoinRateLimiter, getOrgByInviteCode)
+// Public Route: Mengambil info org dari kode invite (tanpa auth, dilindungi antiInviteCheckRateLimiter)
+router.get('/invite/:code', antiInviteCheckRateLimiter, getOrgByInviteCode)
 
 // Route bergabung via invite code (Dilindungi rate limiter & honeypot anti-script sebelum verifikasi auth)
 router.post('/join', antiJoinRateLimiter, antiScriptHoneypot, requireAuth, joinOrganization)

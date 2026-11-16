@@ -114,49 +114,6 @@ export function requireOrgRole(allowedRoles: (org_member_role | 'auditor' | 'vic
       }
 
       if (!results || results.length === 0) {
-        // Fallback Hierarki Keluarga: Cek apakah user adalah Owner atau Head/Wakil dari Organisasi Induk
-        try {
-          const parentResults = isId
-            ? await prisma.$queryRawUnsafe<any[]>(
-                `
-                SELECT o.id AS organization_id, p.id AS parent_id, p.owner_id AS parent_owner_id, pom.role AS parent_role
-                FROM public.organizations o
-                JOIN public.organizations p ON o.parent_id = p.id
-                LEFT JOIN public.organization_members pom ON pom.organization_id = p.id AND pom.profile_id = $1::uuid
-                WHERE o.id = $2::uuid
-                LIMIT 1
-                `,
-                userId,
-                orgIdOrSlug
-              )
-            : await prisma.$queryRawUnsafe<any[]>(
-                `
-                SELECT o.id AS organization_id, p.id AS parent_id, p.owner_id AS parent_owner_id, pom.role AS parent_role
-                FROM public.organizations o
-                JOIN public.organizations p ON o.parent_id = p.id
-                LEFT JOIN public.organization_members pom ON pom.organization_id = p.id AND pom.profile_id = $1::uuid
-                WHERE LOWER(o.slug) = LOWER($2)
-                LIMIT 1
-                `,
-                userId,
-                orgIdOrSlug
-              )
-
-          if (parentResults && parentResults.length > 0) {
-            const pr = parentResults[0]
-            if (pr.parent_owner_id === userId || pr.parent_role === 'head' || pr.parent_role === 'vice_head') {
-              results = [{
-                organization_id: pr.organization_id,
-                role: 'head'
-              }]
-            }
-          }
-        } catch (hierarchyErr) {
-          console.error('Error checking family parent role fallback:', hierarchyErr)
-        }
-      }
-
-      if (!results || results.length === 0) {
         return res.status(403).json({ error: 'Access denied: You are not a member of this organization' })
       }
 

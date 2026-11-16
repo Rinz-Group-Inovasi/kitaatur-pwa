@@ -89,17 +89,40 @@ export default function InvitePage() {
   }
 
   if (error || !org) {
+    const isRateLimit = typeof error === 'string' && (error.includes('Terlalu banyak') || error.includes('Batas frekuensi') || error.includes('menit'))
+
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 p-4">
-        <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-xl text-center border border-slate-100">
+        <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-xl text-center border border-slate-100 animate-in fade-in zoom-in-95 duration-200">
           <div className="w-16 h-16 bg-rose-50 text-rose-500 rounded-full flex items-center justify-center mx-auto mb-4">
             <LinkIcon className="w-8 h-8" />
           </div>
-          <h1 className="text-2xl font-bold text-slate-900 mb-2">Tautan Tidak Valid</h1>
-          <p className="text-slate-500 mb-8">{error}</p>
-          <Link href="/" className="inline-block py-3 px-6 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 transition-colors">
-            Kembali ke Beranda
-          </Link>
+          <h1 className="text-2xl font-bold text-slate-900 mb-2">
+            {isRateLimit ? 'Akses Terlalu Cepat' : 'Tautan Tidak Valid'}
+          </h1>
+          <p className="text-slate-500 mb-8 leading-relaxed text-sm">
+            {error || 'Link invite tidak valid atau sudah kadaluarsa.'}
+          </p>
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+            {isRateLimit && (
+              <button
+                onClick={() => window.location.reload()}
+                className="w-full sm:w-auto py-3 px-6 bg-[#0087FF] text-white font-bold rounded-xl hover:bg-[#0077E6] transition-colors shadow-sm active:scale-95 text-sm"
+              >
+                Coba Muat Ulang
+              </button>
+            )}
+            <Link 
+              href="/" 
+              className={`w-full sm:w-auto py-3 px-6 font-bold rounded-xl transition-colors text-sm ${
+                isRateLimit 
+                  ? 'bg-slate-100 text-slate-700 hover:bg-slate-200' 
+                  : 'bg-slate-900 text-white hover:bg-slate-800'
+              }`}
+            >
+              Kembali ke Beranda
+            </Link>
+          </div>
         </div>
       </div>
     )
