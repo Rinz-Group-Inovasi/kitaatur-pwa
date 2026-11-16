@@ -34,6 +34,7 @@ import {
   getFamilyInfo,
   generateFamilyCode,
   linkBranchToFamily,
+  addBranchToFamily,
   unlinkBranchFromFamily,
   getFamilyBranches,
   getOrgDashboardOverview
@@ -135,6 +136,7 @@ router.post('/:orgIdOrSlug/family/generate-code', requireOrgRole(['head']), gene
 
 // G3. Tautkan Cabang ke Induk (Hanya Head)
 router.post('/:orgIdOrSlug/family/link', requireOrgRole(['head']), linkBranchToFamily)
+router.post('/:orgIdOrSlug/family/add-branch', requireOrgRole(['head']), addBranchToFamily)
 
 // G4. Putuskan Tautan Cabang (Hanya Head)
 router.post('/:orgIdOrSlug/family/unlink', requireOrgRole(['head']), unlinkBranchFromFamily)

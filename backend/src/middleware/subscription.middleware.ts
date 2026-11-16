@@ -142,6 +142,39 @@ export async function requireActiveOrgSubscription(
       }
     }
 
+    // 3B. Fallback Keluarga: jika ini cabang, cek apakah pengurus induk memiliki langganan aktif
+    if (!activeSub && org.parent_id) {
+      const parentMemberSub = await prisma.organization_members.findFirst({
+        where: {
+          organization_id: org.parent_id,
+          role: { in: ['head', 'vice_head'] },
+          profile: {
+            subscriptions: {
+              some: {
+                status: 'active',
+                expires_at: { gt: currentDate }
+              }
+            }
+          }
+        },
+        include: {
+          profile: {
+            include: {
+              subscriptions: {
+                where: { status: 'active', expires_at: { gt: currentDate } },
+                orderBy: { expires_at: 'desc' },
+                take: 1
+              }
+            }
+          }
+        }
+      })
+
+      if (parentMemberSub?.profile?.subscriptions?.[0]) {
+        activeSub = parentMemberSub.profile.subscriptions[0]
+      }
+    }
+
     if (activeSub) {
       subCache.set(orgId, {
         active: true,

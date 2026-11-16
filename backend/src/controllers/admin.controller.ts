@@ -315,12 +315,12 @@ export async function getOrgExpirationsAdmin(req: Request, res: Response) {
         planType = isSchool ? 'school_free' : 'personal_free'
       }
 
-      // Check Family Link details (Branch linked to Parent with family_code OR Induk with family_code)
+      // Check Family Link details (Branch linked to Parent OR Induk with family_code)
       const isFamilyBranch = Boolean(org.parent_id && org.parent)
       const parentFamilyCode = org.parent?.family_code || null
       const selfFamilyCode = org.family_code || null
       const familyCode = parentFamilyCode || selfFamilyCode || null
-      const isLinkedFamily = Boolean(isFamilyBranch && parentFamilyCode)
+      const isLinkedFamily = isFamilyBranch
 
       // If this org is a branch linked to Induk Family, inherit Induk's active status
       if (isLinkedFamily && org.parent?.owner?.subscriptions) {

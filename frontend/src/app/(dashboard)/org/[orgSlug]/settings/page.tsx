@@ -134,6 +134,9 @@ export default function OrgSettingsPage() {
   const [familyCodeInput, setFamilyCodeInput] = useState('')
   const [copiedCode, setCopiedCode] = useState(false)
   const [showFullscreenQR, setShowFullscreenQR] = useState(false)
+  const [showAddBranchModal, setShowAddBranchModal] = useState(false)
+  const [branchInput, setBranchInput] = useState('')
+  const [addingBranch, setAddingBranch] = useState(false)
   
   const navigateToView = (view: ViewType) => {
     if (view !== 'main') {
@@ -319,6 +322,25 @@ export default function OrgSettingsPage() {
       toast.error(err.response?.data?.error || 'Gagal menautkan ke Induk')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleAddBranch = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!branchInput.trim()) return toast.error('Masukkan slug atau ID organisasi cabang.')
+    setAddingBranch(true)
+    try {
+      const res = await api.post(`/org/${orgSlug}/family/add-branch`, {
+        branchSlugOrId: branchInput.trim()
+      })
+      toast.success(res.data.message || 'Cabang berhasil ditautkan.')
+      setBranchInput('')
+      setShowAddBranchModal(false)
+      await fetchFamilyData()
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Gagal menautkan cabang.')
+    } finally {
+      setAddingBranch(false)
     }
   }
 
@@ -1104,6 +1126,16 @@ export default function OrgSettingsPage() {
                             <h3 className="font-bold text-slate-900 text-base">Daftar Cabang Terhubung</h3>
                             <p className="text-xs text-slate-500 mt-0.5">Total {familyData.children?.length || 0} cabang dalam keluarga ini</p>
                           </div>
+                          {isLeader && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAddBranchModal(true)}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[#0087FF] hover:bg-[#0077E6] text-white rounded-lg text-xs font-bold transition-all shadow-sm active:scale-95"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                              <span>Tautkan Cabang</span>
+                            </button>
+                          )}
                         </div>
 
                         {familyData.children && familyData.children.length > 0 ? (
@@ -1247,6 +1279,75 @@ export default function OrgSettingsPage() {
                     </div>
                   )}
                 </>
+              )}
+
+              {/* Modal Tautkan Cabang untuk Induk */}
+              {showAddBranchModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+                  <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-xl border border-slate-100 space-y-4">
+                    <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-9 h-9 rounded-xl bg-[#E0F4FE] text-[#0087FF] flex items-center justify-center font-bold">
+                          <Network className="w-5 h-5" />
+                        </div>
+                        <div>
+                          <h3 className="font-bold text-slate-900 text-base">Tautkan Organisasi Cabang</h3>
+                          <p className="text-xs text-slate-500">Hubungkan cabang langsung tanpa kode</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddBranchModal(false)}
+                        className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <form onSubmit={handleAddBranch} className="space-y-4 pt-1">
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                          Slug atau ID Organisasi Cabang
+                        </label>
+                        <input
+                          type="text"
+                          value={branchInput}
+                          onChange={(e) => setBranchInput(e.target.value)}
+                          placeholder="contoh: karisma-drumband-sman-2-babelan"
+                          className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:border-[#0087FF] transition"
+                          autoFocus
+                        />
+                        <p className="text-[11px] text-slate-500 mt-1.5 leading-relaxed">
+                          Slug dapat dilihat dari tautan URL dasbor cabang (misal: /org/<strong>slug-organisasi</strong>/dashboard).
+                        </p>
+                      </div>
+
+                      <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl text-xs text-blue-900 flex items-start gap-2.5">
+                        <CheckCircle2 className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
+                        <span>
+                          Organisasi cabang akan otomatis mendapatkan akses penuh paket KitaAtur Family dan seluruh data kas serta presensi mereka tetap aman.
+                        </span>
+                      </div>
+
+                      <div className="flex items-center justify-end gap-2 pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowAddBranchModal(false)}
+                          className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+                        >
+                          Batal
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={addingBranch || !branchInput.trim()}
+                          className="px-4 py-2 text-xs font-bold text-white bg-[#0087FF] hover:bg-[#0077E6] rounded-xl transition shadow-sm disabled:opacity-50"
+                        >
+                          {addingBranch ? 'Menautkan...' : 'Tautkan Sekarang'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                </div>
               )}
             </div>
           )}

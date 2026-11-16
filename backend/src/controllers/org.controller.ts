@@ -3,6 +3,7 @@ import { prisma } from '../config/db'
 import { sendPushNotification } from './notification.controller'
 import { supabaseAdmin } from '../config/supabaseAdmin'
 import { org_member_role, Prisma } from '@prisma/client'
+import { clearSubCache } from '../middleware/subscription.middleware'
 
 const isSuperAdminEmail = (email?: string | null): boolean => {
   if (!email) return false
@@ -1329,20 +1330,58 @@ export async function removeOrganizationMember(req: Request, res: Response) {
 // ==========================================
 
 // Helper: Verifikasi apakah user/organisasi memiliki paket aktif Family atau Enterprise
-async function checkHasFamilySubscription(userId: string, userEmail?: string): Promise<boolean> {
+async function checkHasFamilySubscription(userId?: string | null, userEmail?: string, orgId?: string | null): Promise<boolean> {
   if (isSuperAdminEmail(userEmail)) return true
   try {
-    const subs = await prisma.subscriptions.findMany({
-      where: {
-        profile_id: userId,
-        status: 'active',
-        expires_at: { gt: new Date() }
+    // 1. Cek langsung user jika ada
+    if (userId) {
+      const subs = await prisma.subscriptions.findMany({
+        where: {
+          profile_id: userId,
+          status: 'active',
+          expires_at: { gt: new Date() }
+        }
+      })
+      if (subs.some((s: any) => {
+        const pt = (s.plan_type || '').toLowerCase()
+        return pt.includes('family') || pt.includes('enterprise')
+      })) {
+        return true
       }
-    })
-    return subs.some((s: any) => {
-      const pt = (s.plan_type || '').toLowerCase()
-      return pt.includes('family') || pt.includes('enterprise')
-    })
+    }
+
+    // 2. Cek pemilik organisasi dan para pengurus inti (Head/Wakil) jika orgId disertakan
+    if (orgId) {
+      const org = await prisma.organizations.findUnique({
+        where: { id: orgId },
+        include: {
+          organization_members: {
+            where: { role: { in: ['head', 'vice_head'] } },
+            select: { profile_id: true }
+          }
+        }
+      })
+      if (org) {
+        const candidateProfileIds = [org.owner_id, ...org.organization_members.map(m => m.profile_id)].filter(Boolean) as string[]
+        if (candidateProfileIds.length > 0) {
+          const subs = await prisma.subscriptions.findMany({
+            where: {
+              profile_id: { in: candidateProfileIds },
+              status: 'active',
+              expires_at: { gt: new Date() }
+            }
+          })
+          if (subs.some((s: any) => {
+            const pt = (s.plan_type || '').toLowerCase()
+            return pt.includes('family') || pt.includes('enterprise')
+          })) {
+            return true
+          }
+        }
+      }
+    }
+
+    return false
   } catch {
     return false
   }
@@ -1397,10 +1436,10 @@ export async function getFamilyInfo(req: Request, res: Response) {
     let coveredByFamily = false
     let hasFamilySubscription = false
 
-    if (isBranch && org.parent?.owner_id) {
-      coveredByFamily = await checkHasFamilySubscription(org.parent.owner_id)
-    } else if (org.owner_id) {
-      hasFamilySubscription = await checkHasFamilySubscription(org.owner_id, user?.email)
+    if (isBranch && (org.parent?.owner_id || org.parent_id)) {
+      coveredByFamily = await checkHasFamilySubscription(org.parent?.owner_id, user?.email, org.parent_id)
+    } else {
+      hasFamilySubscription = await checkHasFamilySubscription(org.owner_id, user?.email, org.id)
     }
 
     // Hanya Head, Wakil Ketua, dan Sekretaris yang dapat melihat family_code
@@ -1456,7 +1495,7 @@ export async function generateFamilyCode(req: Request, res: Response) {
     }
 
     // Verifikasi kepemilikan paket Family atau Enterprise
-    const isEligible = await checkHasFamilySubscription(user.id, user?.email)
+    const isEligible = await checkHasFamilySubscription(user.id, user?.email, org.id)
     if (!isEligible) {
       return res.status(403).json({
         error: 'Fitur Keluarga & Tautan Cabang memerlukan paket langganan KitaAtur Family. Silakan tingkatkan paket Anda.',
@@ -1488,6 +1527,7 @@ export async function generateFamilyCode(req: Request, res: Response) {
 // 3. Tautkan Cabang ke Induk via Kode Keluarga (Head & Wakil Ketua Cabang)
 export async function linkBranchToFamily(req: Request, res: Response) {
   const orgMemberContext = (req as any).orgMember
+  const user = (req as any).user
   if (!orgMemberContext || (orgMemberContext.role !== 'head' && orgMemberContext.role !== 'vice_head')) {
     return res.status(403).json({ error: 'Hanya Ketua atau Wakil Ketua organisasi yang dapat menautkan ke Induk.' })
   }
@@ -1537,13 +1577,11 @@ export async function linkBranchToFamily(req: Request, res: Response) {
     }
 
     // Verifikasi Induk memiliki langganan Family aktif
-    if (parentOrg.owner_id) {
-      const parentHasFamily = await checkHasFamilySubscription(parentOrg.owner_id)
-      if (!parentHasFamily) {
-        return res.status(400).json({
-          error: 'Organisasi Induk saat ini belum memiliki paket langganan KitaAtur Family yang aktif.'
-        })
-      }
+    const parentHasFamily = await checkHasFamilySubscription(parentOrg.owner_id, user?.email, parentOrg.id)
+    if (!parentHasFamily) {
+      return res.status(400).json({
+        error: 'Organisasi Induk saat ini belum memiliki paket langganan KitaAtur Family yang aktif.'
+      })
     }
 
     // Tautkan cabang
@@ -1551,6 +1589,8 @@ export async function linkBranchToFamily(req: Request, res: Response) {
       where: { id: currentOrg.id },
       data: { parent_id: parentOrg.id }
     })
+
+    clearSubCache(currentOrg.id)
 
     return res.status(200).json({
       success: true,
@@ -1563,6 +1603,88 @@ export async function linkBranchToFamily(req: Request, res: Response) {
     })
   } catch (err) {
     console.error('Error linking branch to family:', err)
+    return res.status(500).json({ error: 'Internal Server Error' })
+  }
+}
+
+// 3B. Tautkan Cabang Secara Langsung oleh Induk (Head / Wakil Ketua Induk)
+export async function addBranchToFamily(req: Request, res: Response) {
+  const orgMemberContext = (req as any).orgMember
+  const user = (req as any).user
+  if (!orgMemberContext || (orgMemberContext.role !== 'head' && orgMemberContext.role !== 'vice_head')) {
+    return res.status(403).json({ error: 'Hanya Ketua atau Wakil Ketua Induk yang dapat menambahkan cabang.' })
+  }
+
+  const { branchSlugOrId } = req.body || {}
+  if (!branchSlugOrId || typeof branchSlugOrId !== 'string' || branchSlugOrId.trim() === '') {
+    return res.status(400).json({ error: 'ID atau Slug organisasi cabang wajib diisi.' })
+  }
+
+  try {
+    const parentOrg = await prisma.organizations.findUnique({
+      where: { id: orgMemberContext.organizationId }
+    })
+
+    if (!parentOrg) {
+      return res.status(404).json({ error: 'Organisasi Induk tidak ditemukan.' })
+    }
+
+    if (parentOrg.parent_id) {
+      return res.status(400).json({ error: 'Organisasi cabang tidak dapat menambahkan cabang lain.' })
+    }
+
+    // Verifikasi kepemilikan paket Family
+    const hasFamily = await checkHasFamilySubscription(parentOrg.owner_id, user?.email, parentOrg.id)
+    if (!hasFamily) {
+      return res.status(403).json({
+        error: 'Organisasi Anda belum memiliki paket KitaAtur Family yang aktif.',
+        needsUpgrade: true
+      })
+    }
+
+    const cleanParam = branchSlugOrId.trim()
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(cleanParam)
+
+    const targetBranch = await prisma.organizations.findFirst({
+      where: isUuid ? { id: cleanParam } : { slug: cleanParam.toLowerCase() }
+    })
+
+    if (!targetBranch) {
+      return res.status(404).json({ error: 'Organisasi cabang tidak ditemukan.' })
+    }
+
+    if (targetBranch.id === parentOrg.id) {
+      return res.status(400).json({ error: 'Tidak dapat menautkan organisasi ke dirinya sendiri.' })
+    }
+
+    if (targetBranch.parent_id === parentOrg.id) {
+      return res.status(400).json({ error: `${targetBranch.name} sudah menjadi cabang dari organisasi ini.` })
+    }
+
+    if (targetBranch.parent_id) {
+      return res.status(400).json({ error: `${targetBranch.name} sudah terhubung ke organisasi induk lain.` })
+    }
+
+    // Update parent_id
+    await prisma.organizations.update({
+      where: { id: targetBranch.id },
+      data: { parent_id: parentOrg.id }
+    })
+
+    clearSubCache(targetBranch.id)
+
+    return res.status(200).json({
+      success: true,
+      message: `Berhasil menautkan ${targetBranch.name} sebagai cabang dari ${parentOrg.name}.`,
+      branch: {
+        id: targetBranch.id,
+        name: targetBranch.name,
+        slug: targetBranch.slug,
+        logo_url: targetBranch.logo_url
+      }
+    })
+  } catch (err) {
+    console.error('Error adding branch to family:', err)
     return res.status(500).json({ error: 'Internal Server Error' })
   }
 }
@@ -1591,6 +1713,7 @@ export async function unlinkBranchFromFamily(req: Request, res: Response) {
         where: { id: currentOrg.id },
         data: { parent_id: null }
       })
+      clearSubCache(currentOrg.id)
       return res.status(200).json({
         success: true,
         message: 'Berhasil memutuskan hubungan dari Organisasi Induk. Organisasi Anda kini kembali mandiri.'
@@ -1611,6 +1734,7 @@ export async function unlinkBranchFromFamily(req: Request, res: Response) {
         where: { id: branchOrgId },
         data: { parent_id: null }
       })
+      clearSubCache(branchOrgId)
 
       return res.status(200).json({
         success: true,
@@ -1767,6 +1891,15 @@ export async function getOrgDashboardOverview(req: any, res: Response) {
           dues_presets: true,
           is_edu: true,
           owner_id: true,
+          parent_id: true,
+          parent: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              owner_id: true
+            }
+          },
           _count: {
             select: {
               school_links_as_school: true
@@ -1926,64 +2059,134 @@ export async function getOrgDashboardOverview(req: any, res: Response) {
       ? 'head'
       : (currentMember?.role || orgMemberContext.role || 'member');
 
-    // Cek informasi langganan / masa uji coba (trial) dari pemilik organisasi atau pengurus
+    // Cek informasi langganan / masa uji coba (trial) dari pemilik organisasi, naungan induk family, atau pengurus
     let trialInfo: any = null;
     if (org?.id && !isAdminUser) {
       let ownerSub = null;
-      if (org.owner_id) {
-        ownerSub = await prisma.subscriptions.findFirst({
-          where: { profile_id: org.owner_id },
-          orderBy: { created_at: 'desc' }
-        });
-      }
+      let isCoveredByFamily = false;
+      let familyParentName: string | null = null;
+      let familyParentSlug: string | null = null;
 
-      // Fallback: cek jika ada pengurus/anggota organisasi yang memiliki langganan aktif
-      if (!ownerSub || ownerSub.status !== 'active' || new Date(ownerSub.expires_at) < now) {
-        const memberWithSub = await prisma.organization_members.findFirst({
-          where: {
-            organization_id: org.id,
-            profile: {
-              subscriptions: {
-                some: {
+      // Prioritas 1: Jika organisasi ini adalah Cabang di bawah naungan Induk Family
+      if (org.parent_id) {
+        const parentOrg = org.parent || await prisma.organizations.findUnique({
+          where: { id: org.parent_id },
+          select: { id: true, name: true, slug: true, owner_id: true }
+        });
+
+        if (parentOrg) {
+          const parentHasFamily = await checkHasFamilySubscription(parentOrg.owner_id, undefined, parentOrg.id);
+          if (parentHasFamily) {
+            let parentSub = null;
+            if (parentOrg.owner_id) {
+              parentSub = await prisma.subscriptions.findFirst({
+                where: {
+                  profile_id: parentOrg.owner_id,
                   status: 'active',
                   expires_at: { gt: now }
+                },
+                orderBy: { expires_at: 'desc' }
+              });
+            }
+
+            if (!parentSub) {
+              const parentMemberWithSub = await prisma.organization_members.findFirst({
+                where: {
+                  organization_id: parentOrg.id,
+                  role: { in: ['head', 'vice_head'] },
+                  profile: {
+                    subscriptions: {
+                      some: { status: 'active', expires_at: { gt: now } }
+                    }
+                  }
+                },
+                include: {
+                  profile: {
+                    include: {
+                      subscriptions: {
+                        where: { status: 'active', expires_at: { gt: now } },
+                        orderBy: { expires_at: 'desc' },
+                        take: 1
+                      }
+                    }
+                  }
                 }
+              });
+              if (parentMemberWithSub?.profile?.subscriptions?.[0]) {
+                parentSub = parentMemberWithSub.profile.subscriptions[0];
               }
             }
-          },
-          include: {
-            profile: {
-              include: {
-                subscriptions: {
-                  where: { status: 'active', expires_at: { gt: now } },
-                  orderBy: { expires_at: 'desc' },
-                  take: 1
-                }
-              }
+
+            if (parentSub) {
+              isCoveredByFamily = true;
+              familyParentName = parentOrg.name;
+              familyParentSlug = parentOrg.slug;
+              ownerSub = parentSub;
             }
           }
-        });
+        }
+      }
 
-        if (memberWithSub?.profile?.subscriptions?.[0]) {
-          ownerSub = memberWithSub.profile.subscriptions[0];
+      // Prioritas 2: Jika bukan cabang atau induk tidak aktif, cek pemilik & pengurus organisasi ini
+      if (!isCoveredByFamily) {
+        if (org.owner_id) {
+          ownerSub = await prisma.subscriptions.findFirst({
+            where: { profile_id: org.owner_id },
+            orderBy: { created_at: 'desc' }
+          });
+        }
+
+        // Fallback: cek jika ada pengurus/anggota organisasi yang memiliki langganan aktif
+        if (!ownerSub || ownerSub.status !== 'active' || new Date(ownerSub.expires_at) < now) {
+          const memberWithSub = await prisma.organization_members.findFirst({
+            where: {
+              organization_id: org.id,
+              profile: {
+                subscriptions: {
+                  some: {
+                    status: 'active',
+                    expires_at: { gt: now }
+                  }
+                }
+              }
+            },
+            include: {
+              profile: {
+                include: {
+                  subscriptions: {
+                    where: { status: 'active', expires_at: { gt: now } },
+                    orderBy: { expires_at: 'desc' },
+                    take: 1
+                  }
+                }
+              }
+            }
+          });
+
+          if (memberWithSub?.profile?.subscriptions?.[0]) {
+            ownerSub = memberWithSub.profile.subscriptions[0];
+          }
         }
       }
 
       if (ownerSub) {
         const isTrial = (ownerSub.plan_type || '').toLowerCase().includes('trial');
-        const isExpired = new Date(ownerSub.expires_at) < now || ownerSub.status !== 'active';
+        const isExpired = isCoveredByFamily ? false : (new Date(ownerSub.expires_at) < now || ownerSub.status !== 'active');
         const diffMs = new Date(ownerSub.expires_at).getTime() - now.getTime();
         const daysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
         const hoursLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60)));
 
         trialInfo = {
           isTrial,
-          planType: ownerSub.plan_type,
+          planType: isCoveredByFamily ? 'Family (Cabang)' : ownerSub.plan_type,
           status: ownerSub.status,
           isExpired,
           expiresAt: ownerSub.expires_at,
           daysLeft,
-          hoursLeft
+          hoursLeft,
+          isCoveredByFamily,
+          parentName: familyParentName,
+          parentSlug: familyParentSlug
         };
       }
     }

@@ -61,9 +61,41 @@ export async function createSession(req: any, res: Response) {
     const pin_code = Math.floor(1000 + Math.random() * 9000).toString();
     const checkout_pin_code = session_type === 'in_out' ? Math.floor(1000 + Math.random() * 9000).toString() : null;
 
-    let pending_shared_orgs: string[] = [];
+    // Auto-share dengan cabang/induk yang berada dalam keluarga organisasi yang sama
+    const currentOrg = await prisma.organizations.findUnique({
+      where: { id: orgMemberContext.organizationId },
+      select: { id: true, parent_id: true }
+    });
+
+    const rootParentId = currentOrg?.parent_id || currentOrg?.id;
+    let familyOrgIds: string[] = [];
+    if (rootParentId) {
+      const familyOrgs = await prisma.organizations.findMany({
+        where: {
+          OR: [
+            { id: rootParentId },
+            { parent_id: rootParentId }
+          ]
+        },
+        select: { id: true }
+      });
+      familyOrgIds = familyOrgs.map(o => o.id);
+    }
+
+    const autoSharedOrgs: string[] = [];
+    const pending_shared_orgs: string[] = [];
+
     if (Array.isArray(invitedOrgs)) {
-      pending_shared_orgs = invitedOrgs.filter(id => typeof id === 'string');
+      for (const id of invitedOrgs) {
+        if (typeof id === 'string') {
+          // Jika organisasi yang diundang adalah keluarga resmi (cabang / induk), langsung masuk ke shared_with_orgs
+          if (familyOrgIds.includes(id)) {
+            autoSharedOrgs.push(id);
+          } else {
+            pending_shared_orgs.push(id);
+          }
+        }
+      }
     }
 
     const newSession = await prisma.attendance_sessions.create({
@@ -82,6 +114,7 @@ export async function createSession(req: any, res: Response) {
         longitude: safeLon,
         radius_meters: radius_meters || 50,
         is_active: true,
+        shared_with_orgs: autoSharedOrgs,
         pending_shared_orgs
       } as any
     });
@@ -93,6 +126,23 @@ export async function createSession(req: any, res: Response) {
       for (const m of members) {
         if (m.profile_id !== userId) {
           sendPushNotification(m.profile_id, 'Sesi Presensi Dibuka!', `Sesi "${newSession.title}" di ${org.name} telah dibuka. Segera lakukan presensi!`, `/org/${org.slug}/attendance/scan`);
+        }
+      }
+
+      // Notify auto-shared family orgs
+      if (autoSharedOrgs.length > 0) {
+        for (const sharedOrgId of autoSharedOrgs) {
+          const sharedOrg = await prisma.organizations.findUnique({ where: { id: sharedOrgId } });
+          if (sharedOrg) {
+            const members = await prisma.organization_members.findMany({
+              where: { organization_id: sharedOrgId, role: { not: 'auditor' as any } }
+            });
+            for (const m of members) {
+              if (m.profile_id !== userId) {
+                sendPushNotification(m.profile_id, 'Presensi Gabungan Dibuka!', `Sesi "${newSession.title}" gabungan dengan ${org.name} telah dibuka.`, `/org/${sharedOrg.slug}/attendance/scan`);
+              }
+            }
+          }
         }
       }
 

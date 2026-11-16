@@ -646,8 +646,36 @@ export default function OrgDashboardPage() {
           )
         )}
 
+        {/* Family Covered Notice (if organization is covered by an active Family plan) */}
+        {trialInfo?.isCoveredByFamily && !trialInfo.isExpired && (
+          <div className="mb-6 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-slate-900 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex items-start sm:items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                <CheckCircle2 className="w-5 h-5" />
+              </div>
+              <div>
+                <p className="text-xs font-bold text-slate-900 mb-0.5 flex items-center gap-2">
+                  <span>Terhubung ke KitaAtur Family</span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-200/80 text-emerald-800 font-bold uppercase">Akses Penuh Aktif</span>
+                </p>
+                <p className="text-xs text-slate-600 font-normal leading-relaxed">
+                  Organisasi ini merupakan cabang resmi di bawah naungan <strong>{trialInfo.parentName || 'Organisasi Induk'}</strong>. Seluruh fitur kas, presensi, dan data anggota aktif penuh.
+                </p>
+              </div>
+            </div>
+            {trialInfo.parentSlug && (
+              <Link
+                href={`/org/${trialInfo.parentSlug}/settings`}
+                className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-all shrink-0 shadow-sm shadow-emerald-600/20 active:scale-95"
+              >
+                Lihat Induk
+              </Link>
+            )}
+          </div>
+        )}
+
         {/* Paid Subscription Notice (if organization is on paid plan and expiring soon or expired) */}
-        {!trialInfo?.isTrial && trialInfo && (
+        {!trialInfo?.isTrial && trialInfo && !trialInfo.isCoveredByFamily && (
           trialInfo.isExpired ? (
             <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-slate-900 shadow-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-start sm:items-center gap-3">
