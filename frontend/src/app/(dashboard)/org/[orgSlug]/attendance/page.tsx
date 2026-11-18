@@ -20,7 +20,8 @@ import {
   Plus,
   FileText,
   Compass,
-  IdentificationCard
+  IdentificationCard,
+  Desktop
 } from '@phosphor-icons/react'
 import { SpotlightTour, type TourStep } from '@/components/ui/SpotlightTour'
 
@@ -239,6 +240,13 @@ export default function AttendanceDashboardPage() {
             </div>
 
             <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              <Link
+                href={`/org/${orgSlug}/attendance/kiosk?sessionId=${ongoingSession.id}`}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 active:scale-95 text-white font-bold text-xs md:text-sm rounded-xl shadow-md shadow-blue-600/20 transition-all shrink-0"
+              >
+                <Desktop size={16} weight="bold" />
+                <span>Layar Kiosk NFC Gerbang</span>
+              </Link>
               <Link
                 href={`/org/${orgSlug}/attendance/sessions?tab=izin&sessionId=${ongoingSession.id}&mode=scan`}
                 className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs md:text-sm rounded-xl shadow-md shadow-blue-600/20 transition-all shrink-0"
@@ -569,6 +577,13 @@ export default function AttendanceDashboardPage() {
                   <span>Daftar {isSchool ? 'Siswa' : 'Tamu'}</span>
                 </Link>
               </div>
+              <Link 
+                href={`/org/${orgSlug}/attendance/kiosk`}
+                className="w-full py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl text-center shadow-md shadow-blue-600/20 transition-all active:scale-[0.98] text-xs flex items-center justify-center gap-1.5"
+              >
+                <Desktop size={15} weight="bold" />
+                <span>Buka Layar Kiosk NFC Gerbang</span>
+              </Link>
               <Link 
                 href={`/org/${orgSlug}/members/qr`}
                 className="w-full py-2.5 bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200/80 font-bold rounded-xl text-center transition-colors text-xs flex items-center justify-center gap-1.5"

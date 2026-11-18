@@ -543,7 +543,8 @@ export const getGuests = async (req: Request, res: Response) => {
         ...guest,
         check_in_time: guest.guest_attendance?.[0]?.check_in_time || null,
         status: finalStatus,
-        kelas: (guest.custom_data && guest.custom_data.kelas) ? guest.custom_data.kelas : null
+        kelas: (guest.custom_data && guest.custom_data.kelas) ? guest.custom_data.kelas : null,
+        nfc_uid: (guest.custom_data && guest.custom_data.nfc_uid) ? guest.custom_data.nfc_uid : null
       };
     });
 
@@ -580,38 +581,48 @@ export const uploadGuests = async (req: Request, res: Response) => {
       uniqueGuestsMap.set(String(g.name).trim().toLowerCase(), { 
         name: String(g.name).trim(), 
         identifier: String(g.identifier).trim(),
-        kelas: g.kelas ? String(g.kelas).trim() : null
+        kelas: g.kelas ? String(g.kelas).trim() : null,
+        nfc_uid: (g.nfc_uid || g.nfc || g.uid) ? String(g.nfc_uid || g.nfc || g.uid).trim() : null
       });
     });
     const uniqueGuests = Array.from(uniqueGuestsMap.values());
 
     const existingGuests = await prisma.org_guests.findMany({
       where: { organization_id: org.id },
-      select: { identifier: true, name: true, id: true }
+      select: { identifier: true, name: true, id: true, custom_data: true }
     });
     
-    const existingByIdentifier = new Map(existingGuests.map(g => [g.identifier, g.id]));
-    const existingByName = new Map(existingGuests.map(g => [g.name.toLowerCase(), g.id]));
+    const existingByIdentifier = new Map(existingGuests.map(g => [g.identifier, g]));
+    const existingByName = new Map(existingGuests.map(g => [g.name.toLowerCase(), g]));
 
     const ops = uniqueGuests.map(g => {
-      const existingId = existingByIdentifier.get(g.identifier) || existingByName.get(g.name.toLowerCase());
+      const existingGuest = existingByIdentifier.get(g.identifier) || existingByName.get(g.name.toLowerCase());
       
-      if (existingId) {
+      if (existingGuest) {
+        const prevCustomData = (existingGuest.custom_data as any) || {};
+        const mergedCustomData = {
+          ...prevCustomData,
+          ...(g.kelas ? { kelas: g.kelas } : {}),
+          ...(g.nfc_uid ? { nfc_uid: g.nfc_uid } : {})
+        };
         return prisma.org_guests.update({
-          where: { id: existingId },
+          where: { id: existingGuest.id },
           data: { 
             name: g.name,
             identifier: g.identifier,
-            ...(g.kelas ? { custom_data: { kelas: g.kelas } } : {})
+            custom_data: mergedCustomData
           }
         });
       } else {
+        const customData: any = {};
+        if (g.kelas) customData.kelas = g.kelas;
+        if (g.nfc_uid) customData.nfc_uid = g.nfc_uid;
         return prisma.org_guests.create({
           data: {
             organization_id: org.id,
             name: g.name,
             identifier: g.identifier,
-            custom_data: g.kelas ? { kelas: g.kelas } : {}
+            custom_data: Object.keys(customData).length > 0 ? customData : {}
           }
         });
       }
@@ -1969,6 +1980,498 @@ export async function manualBulkCheckIn(req: any, res: Response) {
     });
   } catch (err) {
     console.error('Error manual bulk check-in:', err);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
+}
+
+// ==========================================
+// SISTEM PRESENSI NFC & KIOSK GERBANG SEKOLAH
+// ==========================================
+
+// 1. Tautkan Kartu NFC ke Siswa (org_guests) atau Anggota (organization_members)
+export async function linkNfcCard(req: any, res: Response) {
+  const { orgIdOrSlug } = req.params;
+  const { targetType, targetId, nfcUid, force } = req.body;
+
+  if (!nfcUid || typeof nfcUid !== 'string' || !nfcUid.trim()) {
+    return res.status(400).json({ error: 'Nomor UID kartu NFC wajib diisi.' });
+  }
+  if (!targetId || !targetType) {
+    return res.status(400).json({ error: 'Target siswa/anggota wajib dipilih.' });
+  }
+
+  const cleanUid = nfcUid.trim();
+
+  try {
+    const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgIdOrSlug);
+    const org = await prisma.organizations.findFirst({
+      where: isId ? { id: orgIdOrSlug } : { slug: orgIdOrSlug },
+      select: { id: true, name: true }
+    });
+    if (!org) return res.status(404).json({ error: 'Organisasi tidak ditemukan' });
+
+    // Cek apakah UID sudah digunakan oleh siswa lain di organisasi ini
+    const guests = await prisma.org_guests.findMany({
+      where: { organization_id: org.id },
+      select: { id: true, name: true, custom_data: true }
+    });
+    const conflictGuest = guests.find((g: any) => {
+      if (targetType === 'guest' && g.id === targetId) return false;
+      const cd = (g.custom_data as any) || {};
+      return cd.nfc_uid && String(cd.nfc_uid).toLowerCase() === cleanUid.toLowerCase();
+    });
+
+    const members = await prisma.organization_members.findMany({
+      where: { organization_id: org.id },
+      select: { id: true, profile: { select: { full_name: true } }, custom_data: true }
+    });
+    const conflictMember = members.find((m: any) => {
+      if (targetType === 'member' && m.id === targetId) return false;
+      const cd = (m.custom_data as any) || {};
+      return cd.nfc_uid && String(cd.nfc_uid).toLowerCase() === cleanUid.toLowerCase();
+    });
+
+    if ((conflictGuest || conflictMember) && !force) {
+      const conflictName = conflictGuest ? conflictGuest.name : conflictMember?.profile?.full_name || 'Pengguna lain';
+      return res.status(409).json({
+        conflict: true,
+        conflictName,
+        message: `Kartu ini (${cleanUid}) sudah tertaut ke: ${conflictName}. Apakah Anda ingin memindahkannya ke siswa ini?`
+      });
+    }
+
+    // Jika force = true dan ada conflict, lepaskan dari pemilik sebelumnya
+    if (conflictGuest) {
+      const cd = (conflictGuest.custom_data as any) || {};
+      delete cd.nfc_uid;
+      delete cd.nfc_linked_at;
+      await prisma.org_guests.update({
+        where: { id: conflictGuest.id },
+        data: { custom_data: cd }
+      });
+    }
+    if (conflictMember) {
+      const cd = (conflictMember.custom_data as any) || {};
+      delete cd.nfc_uid;
+      delete cd.nfc_linked_at;
+      await prisma.organization_members.update({
+        where: { id: conflictMember.id },
+        data: { custom_data: cd }
+      });
+    }
+
+    // Tautkan kartu ke target
+    let studentName = '';
+    if (targetType === 'guest') {
+      const targetGuest = await prisma.org_guests.findUnique({ where: { id: targetId } });
+      if (!targetGuest) return res.status(404).json({ error: 'Data siswa tidak ditemukan' });
+      studentName = targetGuest.name;
+      const cd = (targetGuest.custom_data as any) || {};
+      cd.nfc_uid = cleanUid;
+      cd.nfc_linked_at = new Date().toISOString();
+      await prisma.org_guests.update({
+        where: { id: targetId },
+        data: { custom_data: cd }
+      });
+    } else {
+      const targetMem = await prisma.organization_members.findUnique({
+        where: { id: targetId },
+        include: { profile: { select: { full_name: true } } }
+      });
+      if (!targetMem) return res.status(404).json({ error: 'Data anggota tidak ditemukan' });
+      studentName = targetMem.profile?.full_name || 'Anggota';
+      const cd = (targetMem.custom_data as any) || {};
+      cd.nfc_uid = cleanUid;
+      cd.nfc_linked_at = new Date().toISOString();
+      await prisma.organization_members.update({
+        where: { id: targetId },
+        data: { custom_data: cd }
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: `Kartu NFC (${cleanUid}) berhasil ditautkan ke ${studentName}.`,
+      nfcUid: cleanUid,
+      studentName
+    });
+  } catch (err) {
+    console.error('Error linking NFC card:', err);
+    return res.status(500).json({ error: 'Gagal menautkan kartu NFC' });
+  }
+}
+
+// 2. Putuskan Tautan Kartu NFC dari Siswa
+export async function unlinkNfcCard(req: any, res: Response) {
+  const { orgIdOrSlug } = req.params;
+  const { targetType, targetId } = req.body;
+
+  try {
+    if (targetType === 'guest') {
+      const g = await prisma.org_guests.findUnique({ where: { id: targetId } });
+      if (g) {
+        const cd = (g.custom_data as any) || {};
+        delete cd.nfc_uid;
+        delete cd.nfc_linked_at;
+        await prisma.org_guests.update({ where: { id: targetId }, data: { custom_data: cd } });
+      }
+    } else {
+      const m = await prisma.organization_members.findUnique({ where: { id: targetId } });
+      if (m) {
+        const cd = (m.custom_data as any) || {};
+        delete cd.nfc_uid;
+        delete cd.nfc_linked_at;
+        await prisma.organization_members.update({ where: { id: targetId }, data: { custom_data: cd } });
+      }
+    }
+    return res.status(200).json({ success: true, message: 'Tautan kartu NFC berhasil dilepas.' });
+  } catch (err) {
+    console.error('Error unlinking NFC card:', err);
+    return res.status(500).json({ error: 'Gagal melepas kartu NFC' });
+  }
+}
+
+// 3. Proses Tap Kartu NFC di Kiosk Presensi Gerbang (Super Cepat < 100ms)
+export async function processNfcTap(req: any, res: Response) {
+  const { orgIdOrSlug } = req.params;
+  const { nfcUid, sessionId } = req.body;
+
+  if (!nfcUid || typeof nfcUid !== 'string' || !nfcUid.trim()) {
+    return res.status(400).json({ error: 'UID kartu tidak terbaca dengan jelas.' });
+  }
+
+  const cleanUid = nfcUid.trim();
+
+  try {
+    const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgIdOrSlug);
+    const org = await prisma.organizations.findFirst({
+      where: isId ? { id: orgIdOrSlug } : { slug: orgIdOrSlug },
+      select: { id: true, name: true, slug: true }
+    });
+    if (!org) return res.status(404).json({ error: 'Organisasi tidak ditemukan' });
+
+    // Cari siswa (org_guests) terlebih dahulu
+    const guests = await prisma.org_guests.findMany({
+      where: { organization_id: org.id },
+      select: { id: true, name: true, identifier: true, custom_data: true }
+    });
+    const matchedGuest = guests.find((g: any) => {
+      const cd = (g.custom_data as any) || {};
+      return (cd.nfc_uid && String(cd.nfc_uid).toLowerCase() === cleanUid.toLowerCase())
+        || (g.identifier && String(g.identifier).toLowerCase() === cleanUid.toLowerCase());
+    });
+
+    let matchedMember: any = null;
+    if (!matchedGuest) {
+      const members = await prisma.organization_members.findMany({
+        where: { organization_id: org.id },
+        include: { profile: { select: { id: true, full_name: true, email: true, avatar_url: true } } }
+      });
+      matchedMember = members.find((m: any) => {
+        const cd = (m.custom_data as any) || {};
+        return (cd.nfc_uid && String(cd.nfc_uid).toLowerCase() === cleanUid.toLowerCase())
+          || (m.profile_id && String(m.profile_id).toLowerCase() === cleanUid.toLowerCase());
+      });
+    }
+
+    if (!matchedGuest && !matchedMember) {
+      return res.status(404).json({
+        error: `Kartu NFC (${cleanUid}) belum terdaftar pada siswa mana pun.`,
+        unregistered: true,
+        nfcUid: cleanUid
+      });
+    }
+
+    const now = new Date();
+
+    // Tentukan sesi presensi yang relevan
+    let session = null;
+    if (sessionId && sessionId.length === 36) {
+      session = await prisma.attendance_sessions.findUnique({
+        where: { id: sessionId }
+      });
+    }
+
+    if (!session || !session.is_active) {
+      // Cari sesi yang aktif saat ini (berjalan hari ini)
+      session = await prisma.attendance_sessions.findFirst({
+        where: {
+          organization_id: org.id,
+          is_active: true,
+          end_time: { gte: now }
+        },
+        orderBy: { start_time: 'desc' }
+      });
+    }
+
+    if (!session) {
+      return res.status(404).json({
+        error: 'Tidak ada sesi presensi yang sedang aktif untuk saat ini. Buka sesi presensi terlebih dahulu.',
+        noSession: true
+      });
+    }
+
+    // Tentukan status kehadiran (present vs late)
+    let status: 'present' | 'late' = 'present';
+    if (session.late_time && now > new Date(session.late_time)) {
+      status = 'late';
+    }
+
+    // Cek rentang absen pulang jika sesi bertipe in_out
+    const isCheckOutWindow = Boolean(
+      session.session_type === 'in_out' &&
+      session.checkout_start_time &&
+      now >= new Date(session.checkout_start_time)
+    );
+
+    const studentInfo = matchedGuest ? {
+      id: matchedGuest.id,
+      name: matchedGuest.name,
+      identifier: matchedGuest.identifier,
+      kelas: (matchedGuest.custom_data as any)?.kelas || null,
+      type: 'guest',
+      avatar_url: null
+    } : {
+      id: matchedMember.id,
+      name: matchedMember.profile?.full_name || 'Anggota',
+      identifier: (matchedMember.custom_data as any)?.nis || matchedMember.profile?.email,
+      kelas: (matchedMember.custom_data as any)?.kelas || null,
+      type: 'member',
+      avatar_url: matchedMember.profile?.avatar_url || null
+    };
+
+    // Skenario A: Siswa Tamu / Edu Guest
+    if (matchedGuest) {
+      const existing = await prisma.guest_attendance.findFirst({
+        where: { session_id: session.id, guest_id: matchedGuest.id }
+      });
+
+      if (existing) {
+        const timeDiffSeconds = (now.getTime() - new Date(existing.created_at).getTime()) / 1000;
+        // Debounce: jika kartu baru saja di-tap dalam 15 detik terakhir
+        if (timeDiffSeconds < 15) {
+          return res.status(200).json({
+            success: true,
+            alreadyRecorded: true,
+            student: studentInfo,
+            status: existing.status,
+            checkInTime: existing.check_in_time,
+            message: `${studentInfo.name} sudah tercatat hadir barusan.`
+          });
+        }
+
+        return res.status(200).json({
+          success: true,
+          alreadyRecorded: true,
+          student: studentInfo,
+          status: existing.status,
+          checkInTime: existing.check_in_time,
+          message: `${studentInfo.name} sudah tercatat ${existing.status === 'late' ? 'Terlambat' : 'Hadir'} sebelumnya.`
+        });
+      }
+
+      // Catat kehadiran baru
+      const record = await prisma.guest_attendance.create({
+        data: {
+          session_id: session.id,
+          guest_id: matchedGuest.id,
+          status,
+          check_in_time: now
+        }
+      });
+
+      return res.status(200).json({
+        success: true,
+        student: studentInfo,
+        status,
+        checkInTime: now,
+        isCheckOut: false,
+        message: `Presensi Berhasil: ${studentInfo.name} (${status === 'late' ? 'Terlambat' : 'Hadir Tepat Waktu'})`
+      });
+    }
+
+    // Skenario B: Siswa Terdaftar (Member)
+    if (matchedMember) {
+      const existing = await prisma.attendance.findFirst({
+        where: { session_id: session.id, profile_id: matchedMember.profile_id }
+      });
+
+      if (isCheckOutWindow && existing) {
+        if (existing.check_out_time) {
+          return res.status(200).json({
+            success: true,
+            alreadyRecorded: true,
+            isCheckOut: true,
+            student: studentInfo,
+            status: existing.status,
+            checkInTime: existing.check_out_time,
+            message: `${studentInfo.name} sudah absen pulang sebelumnya.`
+          });
+        }
+        await prisma.attendance.update({
+          where: { id: existing.id },
+          data: { check_out_time: now }
+        });
+        return res.status(200).json({
+          success: true,
+          isCheckOut: true,
+          student: studentInfo,
+          status: existing.status,
+          checkInTime: now,
+          message: `Absen Pulang Berhasil: ${studentInfo.name}`
+        });
+      }
+
+      if (existing) {
+        return res.status(200).json({
+          success: true,
+          alreadyRecorded: true,
+          student: studentInfo,
+          status: existing.status,
+          checkInTime: existing.check_in_time,
+          message: `${studentInfo.name} sudah tercatat hadir sebelumnya.`
+        });
+      }
+
+      await prisma.attendance.create({
+        data: {
+          organization_id: org.id,
+          profile_id: matchedMember.profile_id,
+          session_id: session.id,
+          status,
+          check_in_time: now,
+          notes: '[TAP_NFC_KIOSK]'
+        } as any
+      });
+
+      return res.status(200).json({
+        success: true,
+        student: studentInfo,
+        status,
+        checkInTime: now,
+        isCheckOut: false,
+        message: `Presensi Berhasil: ${studentInfo.name} (${status === 'late' ? 'Terlambat' : 'Hadir Tepat Waktu'})`
+      });
+    }
+  } catch (err) {
+    console.error('Error processing NFC tap:', err);
+    return res.status(500).json({ error: 'Terjadi kesalahan saat memproses tap kartu' });
+  }
+}
+
+// 4. Informasi Sesi & Statistik Kiosk Real-Time
+export async function getNfcKioskInfo(req: any, res: Response) {
+  const { orgIdOrSlug } = req.params;
+  const { sessionId } = req.query;
+
+  try {
+    const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgIdOrSlug);
+    const org = await prisma.organizations.findFirst({
+      where: isId ? { id: orgIdOrSlug } : { slug: orgIdOrSlug },
+      select: { id: true, name: true, slug: true, logo_url: true, is_edu: true }
+    });
+    if (!org) return res.status(404).json({ error: 'Organisasi tidak ditemukan' });
+
+    const now = new Date();
+
+    // Sesi aktif
+    let session: any = null;
+    if (sessionId && typeof sessionId === 'string' && sessionId.length === 36) {
+      session = await prisma.attendance_sessions.findUnique({ where: { id: sessionId } });
+    }
+
+    if (!session || !session.is_active) {
+      session = await prisma.attendance_sessions.findFirst({
+        where: {
+          organization_id: org.id,
+          is_active: true,
+          end_time: { gte: now }
+        },
+        orderBy: { start_time: 'desc' }
+      });
+    }
+
+    // Hitung total siswa (guests + members)
+    const [totalGuests, totalMembers] = await Promise.all([
+      prisma.org_guests.count({ where: { organization_id: org.id } }),
+      prisma.organization_members.count({ where: { organization_id: org.id, role: { not: 'auditor' as any } } })
+    ]);
+    const totalStudents = totalGuests > 0 ? totalGuests : totalMembers;
+
+    let presentCount = 0;
+    let lateCount = 0;
+    let recentTaps: any[] = [];
+
+    if (session) {
+      const [guestRecords, memberRecords] = await Promise.all([
+        prisma.guest_attendance.findMany({
+          where: { session_id: session.id },
+          include: { guest: { select: { id: true, name: true, identifier: true, custom_data: true } } },
+          orderBy: { check_in_time: 'desc' },
+          take: 15
+        }),
+        prisma.attendance.findMany({
+          where: { session_id: session.id },
+          include: { profile: { select: { id: true, full_name: true, email: true, avatar_url: true } } },
+          orderBy: { check_in_time: 'desc' },
+          take: 15
+        })
+      ]);
+
+      // Gabungkan recent taps
+      const mappedGuests = guestRecords.map((r: any) => ({
+        id: r.id,
+        name: r.guest?.name || 'Siswa',
+        identifier: r.guest?.identifier || '-',
+        kelas: (r.guest?.custom_data as any)?.kelas || null,
+        status: r.status,
+        checkInTime: r.check_in_time,
+        type: 'guest'
+      }));
+
+      const mappedMembers = memberRecords.map((r: any) => ({
+        id: r.id,
+        name: r.profile?.full_name || 'Anggota',
+        identifier: r.profile?.email || '-',
+        kelas: null,
+        status: r.status,
+        checkInTime: r.check_in_time,
+        type: 'member'
+      }));
+
+      recentTaps = [...mappedGuests, ...mappedMembers]
+        .sort((a, b) => new Date(b.checkInTime).getTime() - new Date(a.checkInTime).getTime())
+        .slice(0, 10);
+
+      // Hitung total hadir & telat
+      const [gPresent, gLate, mPresent, mLate] = await Promise.all([
+        prisma.guest_attendance.count({ where: { session_id: session.id, status: 'present' } }),
+        prisma.guest_attendance.count({ where: { session_id: session.id, status: 'late' } }),
+        prisma.attendance.count({ where: { session_id: session.id, status: 'present' } }),
+        prisma.attendance.count({ where: { session_id: session.id, status: 'late' } })
+      ]);
+
+      presentCount = gPresent + mPresent;
+      lateCount = gLate + mLate;
+    }
+
+    const totalAttended = presentCount + lateCount;
+    const notYetCount = Math.max(0, totalStudents - totalAttended);
+
+    return res.status(200).json({
+      organization: org,
+      session,
+      stats: {
+        totalStudents,
+        presentCount,
+        lateCount,
+        notYetCount,
+        totalAttended
+      },
+      recentTaps
+    });
+  } catch (err) {
+    console.error('Error fetching NFC kiosk info:', err);
     return res.status(500).json({ error: 'Internal Server Error' });
   }
 }

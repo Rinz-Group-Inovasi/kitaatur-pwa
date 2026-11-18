@@ -20,7 +20,11 @@ import {
   getPendingCollaborations,
   acceptCollaboration,
   rejectCollaboration,
-  getSessionMembers
+  getSessionMembers,
+  linkNfcCard,
+  unlinkNfcCard,
+  processNfcTap,
+  getNfcKioskInfo
 } from '../controllers/attendance.controller'
 
 import {
@@ -91,6 +95,14 @@ router.post('/:orgIdOrSlug/sessions/:sessionId/guests/scan', requireOrgRole(['he
 router.post('/:orgIdOrSlug/sessions/:sessionId/members/scan', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, scanGuestQR)
 router.post('/:orgIdOrSlug/sessions/:sessionId/scan', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, scanGuestQR)
 router.get('/:orgIdOrSlug/sessions/:sessionId/guests/stats', requireOrgRole(['head', 'sekretaris', 'member']), getGuestStats)
+
+// ========================
+// NFC Attendance & Kiosk Tap
+// ========================
+router.post('/:orgIdOrSlug/nfc/link', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, linkNfcCard)
+router.post('/:orgIdOrSlug/nfc/unlink', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, unlinkNfcCard)
+router.post('/:orgIdOrSlug/nfc/tap', requireOrgRole(['head', 'sekretaris', 'member']), requireActiveOrgSubscription, processNfcTap)
+router.get('/:orgIdOrSlug/nfc/kiosk-info', requireOrgRole(['head', 'sekretaris', 'member', 'auditor']), getNfcKioskInfo)
 
 
 // ========================
