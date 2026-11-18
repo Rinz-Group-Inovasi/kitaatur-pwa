@@ -14,6 +14,21 @@ export async function getTrialStatus(req: Request, res: Response) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
+  // Superadmin / God Mode Bypass: otomatis memiliki paket langganan aktif permanen
+  const adminEmails = (process.env.ADMIN_EMAIL || 'generalrino@gmail.com').split(',').map((e) => e.trim().toLowerCase())
+  if (userEmail && adminEmails.includes(userEmail.toLowerCase())) {
+    return res.status(200).json({
+      eligible: false,
+      hasActiveTrial: false,
+      hasActiveSubscription: true,
+      isExpired: false,
+      daysLeft: 99999,
+      hoursLeft: 999999,
+      isAdmin: true,
+      reason: 'Akun Superadmin memiliki bypass langganan tanpa batas (Unlimited God Mode).'
+    })
+  }
+
   try {
     const now = new Date()
 

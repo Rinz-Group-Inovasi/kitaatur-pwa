@@ -132,3 +132,4 @@ class KioskAudioManager {
 }
 
 export const kioskAudio = new KioskAudioManager()
+

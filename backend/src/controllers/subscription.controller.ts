@@ -1,6 +1,13 @@
 import { Request, Response } from 'express'
 import { prisma } from '../config/db'
 
+const isSuperAdminEmail = (email?: string | null): boolean => {
+  if (!email) return false
+  const env = process.env.ADMIN_EMAIL || 'generalrino@gmail.com'
+  const list = env.split(',').map((e) => e.trim().toLowerCase())
+  return list.includes(email.toLowerCase())
+}
+
 export async function getMySubscriptions(req: Request, res: Response) {
   const userId = (req as any).user?.id
   const userEmail = (req as any).user?.email
@@ -133,6 +140,25 @@ export async function getMySubscriptions(req: Request, res: Response) {
       consolidated.push(sorted[0])
     }
 
+    // Jika user adalah Superadmin / God Mode, sematkan langganan aktif tanpa batas di paling atas
+    const isAdmin = isSuperAdminEmail(userEmail)
+    if (isAdmin) {
+      const adminSub = {
+        id: 'superadmin-unlimited-bypass',
+        profile_id: userId,
+        plan_type: 'KitaAtur Enterprise (Unlimited Admin)',
+        status: 'active',
+        amount_paid: 0,
+        starts_at: '2024-01-01T00:00:00.000Z',
+        expires_at: '2099-12-31T23:59:59.999Z',
+        created_at: '2024-01-01T00:00:00.000Z',
+        organization_name: 'Semua Organisasi (Bypass Penuh)',
+        organization_slug: 'all-unlimited',
+        is_admin_bypass: true
+      }
+      consolidated.unshift(adminSub)
+    }
+
     return res.status(200).json(consolidated)
   } catch (err: any) {
     console.error('Error fetching subscriptions:', err)
@@ -145,6 +171,24 @@ export async function getSubscriptionById(req: Request, res: Response) {
 
   if (!id) {
     return res.status(400).json({ error: 'Subscription ID is required' })
+  }
+
+  // Handle virtual superadmin subscription ID
+  if (id === 'superadmin-unlimited-bypass') {
+    return res.status(200).json({
+      id: 'superadmin-unlimited-bypass',
+      plan_type: 'KitaAtur Enterprise (Unlimited Admin)',
+      status: 'active',
+      amount_paid: 0,
+      original_amount: 0,
+      discount_amount: 0,
+      starts_at: '2024-01-01T00:00:00.000Z',
+      expires_at: '2099-12-31T23:59:59.999Z',
+      created_at: '2024-01-01T00:00:00.000Z',
+      organization_name: 'Semua Organisasi (Bypass Penuh)',
+      organization_slug: 'all-unlimited',
+      is_admin_bypass: true
+    })
   }
 
   try {

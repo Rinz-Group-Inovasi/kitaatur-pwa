@@ -39,6 +39,7 @@ export default function SettingsPage() {
   const [userName, setUserName] = useState('Pengguna')
   const [userAvatar, setUserAvatar] = useState<string | null>(null)
   const [isVerified, setIsVerified] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const [saving, setSaving] = useState(false)
   
   const navigateToView = (view: ViewType) => {
@@ -86,12 +87,20 @@ export default function SettingsPage() {
         setUserName(profile?.full_name || 'Pengguna')
         setUserAvatar(profile?.avatar_url || null)
 
-        try {
-          const res = await api.get('/subscription/me')
-          const hasActiveSub = res.data.some((s: any) => s.status === 'active')
-          setIsVerified(hasActiveSub)
-        } catch (e) {
-          console.error('Failed to fetch subs for verification', e)
+        const adminList = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'generalrino@gmail.com').split(',').map((e) => e.trim().toLowerCase())
+        const userIsAdmin = Boolean(profile?.is_admin || (user.email && adminList.includes(user.email.toLowerCase())))
+        setIsAdmin(userIsAdmin)
+
+        if (userIsAdmin) {
+          setIsVerified(true)
+        } else {
+          try {
+            const res = await api.get('/subscription/me')
+            const hasActiveSub = res.data.some((s: any) => s.status === 'active')
+            setIsVerified(hasActiveSub)
+          } catch (e) {
+            console.error('Failed to fetch subs for verification', e)
+          }
         }
       }
     } catch (e) {
@@ -225,7 +234,7 @@ export default function SettingsPage() {
 
           {activeView === 'switcher' && (
             <div className="space-y-4">
-              {isVerified ? (
+              {isVerified || isAdmin ? (
                 <Link href="/org/create" className="flex items-center justify-center gap-2 w-full py-4 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl font-bold transition-colors mb-6">
                   <Plus className="w-5 h-5" />
                   Buat Organisasi Baru
@@ -426,36 +435,78 @@ export default function SettingsPage() {
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5 min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap min-w-0">
                 <h2 className="text-base sm:text-lg font-bold text-slate-900 truncate">{userName}</h2>
-                {isVerified && (
+                {(isVerified || isAdmin) && (
                   <BadgeCheck size={18} weight="fill" className="text-[#0087FF] shrink-0" />
                 )}
+                {isAdmin && (
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gradient-to-r from-amber-500 to-orange-500 text-white shadow-xs uppercase tracking-wider">
+                    👑 Superadmin Unlimited
+                  </span>
+                )}
               </div>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Tampilkan profil & info akun</p>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                {isAdmin ? 'Akun Superadmin • Unlimited Bypass & God Mode Aktif' : 'Tampilkan profil & info akun'}
+              </p>
             </div>
           </div>
           <ChevronRight size={18} weight="bold" className="text-slate-400 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
         </button>
 
-        {/* Promo Banner Card */}
-        <Link 
-          href="/org/create"
-          className="block bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 mb-5 sm:mb-6 shadow-md shadow-emerald-600/15 hover:shadow-emerald-600/25 active:scale-[0.99] transition-all relative overflow-hidden group"
-        >
-          <div className="relative z-10 w-3/4">
-            <span className="inline-block px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-white/20 rounded-full border border-white/25 mb-1.5">
-              Organisasi Baru
-            </span>
-            <h3 className="text-base sm:text-lg font-bold mb-1 leading-snug">Bangun organisasi Anda</h3>
-            <p className="text-xs text-white/90 leading-relaxed">
-              Kelola presensi otomatis, anggota, dan keuangan bersama tim.
-            </p>
+        {/* Promo / Superadmin Control Banner */}
+        {isAdmin ? (
+          <div className="block bg-gradient-to-r from-slate-900 via-indigo-950 to-blue-950 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 mb-5 sm:mb-6 shadow-md shadow-blue-900/20 relative overflow-hidden group">
+            <div className="relative z-10 w-full sm:w-4/5">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-300 rounded-full border border-amber-500/30 mb-1.5">
+                ⚡ Unlimited Admin Bypass
+              </span>
+              <h3 className="text-base sm:text-lg font-bold mb-1 leading-snug">
+                Hak Akses Penuh Superadmin
+              </h3>
+              <p className="text-xs text-white/80 leading-relaxed mb-3">
+                Akun ini memiliki bypass tanpa batas untuk seluruh organisasi, presensi NFC, keuangan, dan panel kontrol sistem.
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Link
+                  href="/org/create"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#0087FF] hover:bg-[#0077E6] text-white text-xs font-bold transition shadow-xs active:scale-95"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Buat Organisasi Baru</span>
+                </Link>
+                <Link
+                  href="/admin"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition border border-white/15 active:scale-95"
+                >
+                  <Shield className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Buka Admin Panel</span>
+                </Link>
+              </div>
+            </div>
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1/3 h-full flex items-center justify-end pr-4 opacity-15 pointer-events-none">
+              <Shield size={80} weight="duotone" className="text-white" />
+            </div>
           </div>
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1/3 h-full flex items-center justify-end pr-4 opacity-25 group-hover:opacity-40 transition-opacity pointer-events-none">
-             <Building2 size={70} weight="duotone" className="text-white" />
-          </div>
-        </Link>
+        ) : (
+          <Link 
+            href="/org/create"
+            className="block bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 mb-5 sm:mb-6 shadow-md shadow-emerald-600/15 hover:shadow-emerald-600/25 active:scale-[0.99] transition-all relative overflow-hidden group"
+          >
+            <div className="relative z-10 w-3/4">
+              <span className="inline-block px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-white/20 rounded-full border border-white/25 mb-1.5">
+                Organisasi Baru
+              </span>
+              <h3 className="text-base sm:text-lg font-bold mb-1 leading-snug">Bangun organisasi Anda</h3>
+              <p className="text-xs text-white/90 leading-relaxed">
+                Kelola presensi otomatis, anggota, dan keuangan bersama tim.
+              </p>
+            </div>
+            <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1/3 h-full flex items-center justify-end pr-4 opacity-25 group-hover:opacity-40 transition-opacity pointer-events-none">
+               <Building2 size={70} weight="duotone" className="text-white" />
+            </div>
+          </Link>
+        )}
 
         {/* Grouped Settings Cards */}
         <div className="space-y-5 sm:space-y-6">
@@ -493,7 +544,9 @@ export default function SettingsPage() {
                   </div>
                   <div className="min-w-0">
                     <span className="text-sm sm:text-base font-semibold text-slate-800 block truncate">Langganan & Tagihan</span>
-                    <span className="text-[11px] text-slate-400 block truncate">Paket aktif & riwayat invoice</span>
+                    <span className="text-[11px] text-slate-400 block truncate">
+                      {isAdmin ? '👑 Superadmin Unlimited (Bypass Aktif)' : 'Paket aktif & riwayat invoice'}
+                    </span>
                   </div>
                 </div>
                 <ChevronRight size={16} weight="bold" className="text-slate-400 group-hover:text-slate-700 group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
