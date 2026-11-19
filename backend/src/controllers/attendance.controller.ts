@@ -1991,16 +1991,21 @@ export async function manualBulkCheckIn(req: any, res: Response) {
 // 1. Tautkan Kartu NFC ke Siswa (org_guests) atau Anggota (organization_members)
 export async function linkNfcCard(req: any, res: Response) {
   const { orgIdOrSlug } = req.params;
-  const { targetType, targetId, nfcUid, force } = req.body;
+  const rawUid = req.body.nfcUid || req.body.nfc_uid || req.body.uid;
+  const rawTargetType = req.body.targetType || (req.body.guest_id || req.body.guestId ? 'guest' : req.body.member_id || req.body.memberId ? 'member' : undefined);
+  const rawTargetId = req.body.targetId || req.body.guest_id || req.body.guestId || req.body.member_id || req.body.memberId;
+  const force = Boolean(req.body.force);
 
-  if (!nfcUid || typeof nfcUid !== 'string' || !nfcUid.trim()) {
+  if (!rawUid || typeof rawUid !== 'string' || !rawUid.trim()) {
     return res.status(400).json({ error: 'Nomor UID kartu NFC wajib diisi.' });
   }
-  if (!targetId || !targetType) {
+  if (!rawTargetId || !rawTargetType) {
     return res.status(400).json({ error: 'Target siswa/anggota wajib dipilih.' });
   }
 
-  const cleanUid = nfcUid.trim();
+  const cleanUid = String(rawUid).trim();
+  const targetId = String(rawTargetId).trim();
+  const targetType = String(rawTargetType).trim();
 
   try {
     const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgIdOrSlug);
@@ -2036,6 +2041,7 @@ export async function linkNfcCard(req: any, res: Response) {
       return res.status(409).json({
         conflict: true,
         conflictName,
+        assigned_to: conflictName,
         message: `Kartu ini (${cleanUid}) sudah tertaut ke: ${conflictName}. Apakah Anda ingin memindahkannya ke siswa ini?`
       });
     }
@@ -2093,7 +2099,10 @@ export async function linkNfcCard(req: any, res: Response) {
       success: true,
       message: `Kartu NFC (${cleanUid}) berhasil ditautkan ke ${studentName}.`,
       nfcUid: cleanUid,
-      studentName
+      nfc_uid: cleanUid,
+      studentName,
+      targetId,
+      targetType
     });
   } catch (err) {
     console.error('Error linking NFC card:', err);
@@ -2104,7 +2113,15 @@ export async function linkNfcCard(req: any, res: Response) {
 // 2. Putuskan Tautan Kartu NFC dari Siswa
 export async function unlinkNfcCard(req: any, res: Response) {
   const { orgIdOrSlug } = req.params;
-  const { targetType, targetId } = req.body;
+  const rawTargetType = req.body.targetType || (req.body.guest_id || req.body.guestId ? 'guest' : req.body.member_id || req.body.memberId ? 'member' : 'guest');
+  const rawTargetId = req.body.targetId || req.body.guest_id || req.body.guestId || req.body.member_id || req.body.memberId;
+
+  if (!rawTargetId) {
+    return res.status(400).json({ error: 'Target ID wajib disertakan.' });
+  }
+
+  const targetId = String(rawTargetId).trim();
+  const targetType = String(rawTargetType).trim();
 
   try {
     if (targetType === 'guest') {
@@ -2134,13 +2151,15 @@ export async function unlinkNfcCard(req: any, res: Response) {
 // 3. Proses Tap Kartu NFC di Kiosk Presensi Gerbang (Super Cepat < 100ms)
 export async function processNfcTap(req: any, res: Response) {
   const { orgIdOrSlug } = req.params;
-  const { nfcUid, sessionId } = req.body;
+  const rawUid = req.body.nfcUid || req.body.nfc_uid || req.body.uid;
+  const rawSessionId = req.body.sessionId || req.body.session_id;
 
-  if (!nfcUid || typeof nfcUid !== 'string' || !nfcUid.trim()) {
+  if (!rawUid || typeof rawUid !== 'string' || !rawUid.trim()) {
     return res.status(400).json({ error: 'UID kartu tidak terbaca dengan jelas.' });
   }
 
-  const cleanUid = nfcUid.trim();
+  const cleanUid = rawUid.trim();
+  const sessionId = rawSessionId ? String(rawSessionId).trim() : undefined;
 
   try {
     const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgIdOrSlug);

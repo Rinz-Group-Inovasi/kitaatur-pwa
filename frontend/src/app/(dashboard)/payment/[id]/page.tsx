@@ -123,9 +123,9 @@ export default function PaymentPage() {
         </Link>
 
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-          <div className="bg-slate-900 p-6 text-white text-center">
+          <div className="bg-gradient-to-r from-[#0087FF] via-[#0077E6] to-[#01C4FB] p-6 text-white text-center">
             <h2 className="text-xl font-bold mb-1">Tagihan Langganan</h2>
-            <p className="text-slate-400 text-sm">Order ID: {sub.kitapay_transaction_id}</p>
+            <p className="text-white/80 text-sm">Order ID: {sub.kitapay_transaction_id || sub.id}</p>
           </div>
 
           <div className="p-6">

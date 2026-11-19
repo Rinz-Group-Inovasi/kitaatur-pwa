@@ -229,7 +229,7 @@ function GuestsContent() {
 
   // Eksekusi Tautkan Kartu NFC
   const handleLinkNfc = async (uidToLink: string, force = false) => {
-    const cleanUid = uidToLink.trim()
+    const cleanUid = (uidToLink || nfcInputUid || '').trim()
     if (!cleanUid || !selectedStudent || isLinking) return
 
     setIsLinking(true)
@@ -237,8 +237,12 @@ function GuestsContent() {
 
     try {
       const res = await api.post(`/org-attendance/${orgSlug}/nfc/link`, {
+        targetType: 'guest',
+        targetId: selectedStudent.id,
         guest_id: selectedStudent.id,
         nfc_uid: cleanUid,
+        nfcUid: cleanUid,
+        uid: cleanUid,
         force
       })
 
@@ -262,7 +266,7 @@ function GuestsContent() {
         kioskAudio.playError()
         setConflictData({
           uid: cleanUid,
-          assignedTo: err.response.data.assigned_to
+          assignedTo: err.response.data.assigned_to || err.response.data.conflictName || 'Pengguna lain'
         })
       } else {
         kioskAudio.playError()
@@ -283,6 +287,8 @@ function GuestsContent() {
     setIsLinking(true)
     try {
       await api.post(`/org-attendance/${orgSlug}/nfc/unlink`, {
+        targetType: 'guest',
+        targetId: selectedStudent.id,
         guest_id: selectedStudent.id
       })
 

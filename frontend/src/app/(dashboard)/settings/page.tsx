@@ -492,7 +492,7 @@ export default function SettingsPage() {
         ) : (
           <Link 
             href="/org/create"
-            className="block bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 mb-5 sm:mb-6 shadow-md shadow-emerald-600/15 hover:shadow-emerald-600/25 active:scale-[0.99] transition-all relative overflow-hidden group"
+            className="block bg-gradient-to-r from-[#0087FF] via-[#007AE6] to-[#01C4FB] text-white rounded-2xl sm:rounded-3xl p-4 sm:p-5 mb-5 sm:mb-6 shadow-md shadow-blue-500/15 hover:shadow-blue-500/25 active:scale-[0.99] transition-all relative overflow-hidden group"
           >
             <div className="relative z-10 w-3/4">
               <span className="inline-block px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider bg-white/20 rounded-full border border-white/25 mb-1.5">

@@ -173,6 +173,11 @@ export async function getSubscriptionById(req: Request, res: Response) {
     return res.status(400).json({ error: 'Subscription ID is required' })
   }
 
+  // Handle case where 'me' reaches here
+  if (id === 'me') {
+    return getMySubscriptions(req, res)
+  }
+
   // Handle virtual superadmin subscription ID
   if (id === 'superadmin-unlimited-bypass') {
     return res.status(200).json({
@@ -192,13 +197,32 @@ export async function getSubscriptionById(req: Request, res: Response) {
   }
 
   try {
-    let sub: any = await prisma.subscriptions.findUnique({
-      where: { id }
-    })
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
+    
+    let sub: any = null
 
+    // 1. Prisma lookup by ID (if UUID) or by KitaPay Transaction ID
+    if (isUuid) {
+      sub = await prisma.subscriptions.findFirst({
+        where: {
+          OR: [
+            { id },
+            { kitapay_transaction_id: id }
+          ]
+        }
+      })
+    } else {
+      sub = await prisma.subscriptions.findFirst({
+        where: {
+          kitapay_transaction_id: id
+        }
+      })
+    }
+
+    // 2. Fallback using robust string-matching SQL query
     if (!sub) {
       const rows: any[] = await prisma.$queryRawUnsafe(
-        `SELECT * FROM public.subscriptions WHERE id = $1::uuid LIMIT 1`,
+        `SELECT * FROM public.subscriptions WHERE id::text = $1 OR LOWER(kitapay_transaction_id) = LOWER($1) LIMIT 1`,
         id
       )
       sub = rows[0]

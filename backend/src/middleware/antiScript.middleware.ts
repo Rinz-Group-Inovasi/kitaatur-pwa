@@ -92,8 +92,8 @@ export function antiScriptHoneypot(req: Request, res: Response, next: NextFuncti
 
 // 3A. Rate Limiter Khusus: Pemeriksaan Link Invite (Akses Publik Preview Organisasi)
 export const antiInviteCheckRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 menit
-  max: 600, // Maksimal 600x akses per IP per 15 menit (aman untuk puluhan/ratusan siswa dalam 1 Wi-Fi sekolah)
+  windowMs: 5 * 60 * 1000, // 5 menit
+  max: 3000, // Maksimal 3000x akses per IP per 5 menit (sangat aman untuk ribuan siswa & bot link preview)
   standardHeaders: true,
   legacyHeaders: false,
   message: {
@@ -103,8 +103,8 @@ export const antiInviteCheckRateLimiter = rateLimit({
 
 // 3B. Rate Limiter Khusus: Pendaftaran Anggota via Invite Code
 export const antiJoinRateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 menit
-  max: 120, // Maksimal 120x pendaftaran anggota per IP per 15 menit
+  windowMs: 5 * 60 * 1000, // 5 menit
+  max: 600, // Maksimal 600x pendaftaran anggota per IP per 5 menit (aman untuk pendaftaran massal siswa sekolah)
   standardHeaders: true,
   legacyHeaders: false,
   message: {
