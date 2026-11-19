@@ -847,7 +847,17 @@ export async function getOrganizationSettings(req: Request, res: Response) {
       return res.status(404).json({ error: 'Organisasi tidak ditemukan' })
     }
 
-    return res.status(200).json(result[0])
+    const userEmail = (req as any).user?.email
+    const isAdmin = isSuperAdminEmail(userEmail)
+    const effectiveRole = isAdmin ? 'head' : (orgMemberContext.role || 'member')
+
+    return res.status(200).json({
+      ...result[0],
+      currentUserRole: effectiveRole,
+      role: effectiveRole,
+      is_owner: effectiveRole === 'head',
+      is_admin: isAdmin
+    })
   } catch (err) {
     console.error('Error fetching org settings:', err)
     return res.status(500).json({ error: 'Internal Server Error' })

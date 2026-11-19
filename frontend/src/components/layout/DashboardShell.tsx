@@ -16,7 +16,8 @@ import {
   X, 
   TreeStructure, 
   CaretDown,
-  Users
+  Users,
+  IdentificationCard
 } from '@phosphor-icons/react'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
@@ -318,10 +319,11 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   ]
 
   const schoolNavItems = currentOrgSlug ? [
-    { name: 'Dashboard Eksekutif', href: `/org/${currentOrgSlug}/executive`, icon: Buildings },
-    { name: 'Anggota Sekolah', href: `/org/${currentOrgSlug}/members`, icon: Users },
-    { name: 'Personal Space', href: `/personal/dashboard`, icon: House },
-    { name: 'Pengaturan Sekolah', href: `/org/${currentOrgSlug}/settings`, icon: GearSix },
+    { name: 'Dashboard', href: `/org/${currentOrgSlug}/executive`, icon: Buildings },
+    { name: 'Presensi', href: `/org/${currentOrgSlug}/attendance`, icon: QrCode },
+    { name: 'Siswa & NFC', href: `/org/${currentOrgSlug}/attendance/guests`, icon: IdentificationCard },
+    { name: 'Guru & Staf', href: `/org/${currentOrgSlug}/members`, icon: Users },
+    { name: 'Pengaturan', href: `/org/${currentOrgSlug}/settings`, icon: GearSix },
   ] : []
 
   const regularOrgNavItems = currentOrgSlug ? [
@@ -352,6 +354,8 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         items: isCurrentSchool 
           ? [
               { name: 'Dashboard Eksekutif', href: `/org/${currentOrgSlug}/executive`, icon: Buildings },
+              { name: 'Presensi & Sesi', href: `/org/${currentOrgSlug}/attendance`, icon: QrCode },
+              { name: 'Data Siswa & NFC', href: `/org/${currentOrgSlug}/attendance/guests`, icon: IdentificationCard },
               { name: 'Anggota & Guru', href: `/org/${currentOrgSlug}/members`, icon: Users },
               { name: 'Pengaturan Sekolah', href: `/org/${currentOrgSlug}/settings`, icon: GearSix },
             ]

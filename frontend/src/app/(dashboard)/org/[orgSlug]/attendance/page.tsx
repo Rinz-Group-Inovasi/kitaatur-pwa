@@ -97,6 +97,14 @@ export default function AttendanceDashboardPage() {
       setAgendas(agendaRes.data || [])
       setIsSchool(settingsRes.data?.is_edu || false)
 
+      if (settingsRes.data?.currentUserRole) {
+        detectedRole = settingsRes.data.currentUserRole
+        setCurrentUserRole(settingsRes.data.currentUserRole)
+      } else if (settingsRes.data?.role) {
+        detectedRole = settingsRes.data.role
+        setCurrentUserRole(settingsRes.data.role)
+      }
+
       if (results.length > 3) {
         const userRes = results[3]
         const membersRes = results[4]
@@ -145,7 +153,17 @@ export default function AttendanceDashboardPage() {
     )
   }
 
-  const isEditor = currentUserRole === 'head' || currentUserRole === 'vice_head' || currentUserRole === 'sekretaris'
+  const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'generalrino@gmail.com').split(',').map((e) => e.trim().toLowerCase())
+  const isSuperAdmin = Boolean(store.user?.email && adminEmails.includes(store.user.email.toLowerCase()))
+  const isOrgOwner = Boolean(store.orgs.find(o => o.slug === orgSlug || o.id === orgSlug)?.owner_id === store.user?.id)
+
+  const isEditor = isSuperAdmin || 
+                   isOrgOwner || 
+                   currentUserRole === 'head' || 
+                   currentUserRole === 'vice_head' || 
+                   currentUserRole === 'sekretaris' || 
+                   canDelegate ||
+                   (isSchool && (currentUserRole === 'guru' || currentUserRole === 'admin_sekolah' || currentUserRole === 'head'))
 
   const ongoingSession = agendas.find((agenda: any) => {
     const now = new Date()
@@ -179,11 +197,11 @@ export default function AttendanceDashboardPage() {
       <header className="relative z-10 max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 pb-6 border-b border-slate-200">
         <div>
           <Link 
-            href={`/org/${orgSlug}/dashboard`} 
+            href={isSchool ? `/org/${orgSlug}/executive` : `/org/${orgSlug}/dashboard`} 
             className="inline-flex items-center gap-2 text-xs font-medium text-slate-500 hover:text-slate-900 transition-colors mb-2"
           >
             <ArrowLeft size={14} weight="bold" />
-            Kembali ke Dashboard Utama
+            {isSchool ? 'Kembali ke Dashboard Eksekutif' : 'Kembali ke Dashboard Utama'}
           </Link>
           <h1 className="text-3xl font-extrabold text-slate-900 flex items-center gap-2">
             <Clock size={32} weight="duotone" className="text-[#0087FF]" />
@@ -208,7 +226,7 @@ export default function AttendanceDashboardPage() {
               className="bg-[#0087FF] hover:bg-[#0077E6] text-white px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5 transition-all shadow-sm active:scale-95"
             >
               <Plus size={16} weight="bold" />
-              <span>Buka Sesi Baru</span>
+              <span>{isSchool ? 'Buka Sesi Presensi Siswa' : 'Buka Sesi Baru'}</span>
             </Link>
           )}
         </div>
@@ -554,10 +572,12 @@ export default function AttendanceDashboardPage() {
                 <Users size={30} weight="duotone" />
               </div>
               <h3 className="text-xl font-bold text-slate-900 mb-2 group-hover:text-[#0087FF] transition-colors">
-                Buku {isSchool ? 'Siswa Luar / Tamu' : 'Tamu'}
+                {isSchool ? 'Data Siswa & Kartu NFC' : 'Buku Tamu'}
               </h3>
               <p className="text-slate-500 text-sm leading-relaxed mb-6">
-                Data presensi peserta luar organisasi, pendaftaran tamu undangan, dan cetak tiket kartu.
+                {isSchool 
+                  ? 'Kelola data siswa, registrasi kartu NFC dengan USB reader, dan rekap kehadiran gerbang.' 
+                  : 'Data presensi peserta luar organisasi, pendaftaran tamu undangan, dan cetak tiket kartu.'}
               </p>
             </div>
 
@@ -574,7 +594,7 @@ export default function AttendanceDashboardPage() {
                   href={`/org/${orgSlug}/attendance/guests`}
                   className="py-3 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 font-bold rounded-xl text-center transition-colors text-xs flex items-center justify-center"
                 >
-                  <span>Daftar {isSchool ? 'Siswa' : 'Tamu'}</span>
+                  <span>{isSchool ? 'Daftar Siswa & NFC' : 'Daftar Tamu'}</span>
                 </Link>
               </div>
               <Link 

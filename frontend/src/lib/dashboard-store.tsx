@@ -14,6 +14,7 @@ interface OrgData {
   name: string
   slug: string
   logo_url: string | null
+  owner_id?: string | null
   is_edu?: boolean
   _count?: {
     school_links_as_school?: number
@@ -223,11 +224,16 @@ export function DashboardStoreProvider({ children }: { children: ReactNode }) {
   }, [membersMap])
 
   const getCurrentRole = useCallback((orgSlug: string) => {
+    if (!user) return null
+    const adminEmails = (process.env.NEXT_PUBLIC_ADMIN_EMAIL || 'generalrino@gmail.com').split(',').map(e => e.trim().toLowerCase())
+    if (user.email && adminEmails.includes(user.email.toLowerCase())) return 'head'
+    const org = orgs.find(o => o.slug === orgSlug || o.id === orgSlug)
+    if (org && org.owner_id === user.id) return 'head'
     const members = membersMap[orgSlug]
-    if (!members || !user) return null
+    if (!members) return null
     const me = members.find(m => m.profile_id === user.id)
     return me?.role ?? null
-  }, [membersMap, user])
+  }, [membersMap, user, orgs])
 
   return (
     <DashboardStoreContext.Provider value={{

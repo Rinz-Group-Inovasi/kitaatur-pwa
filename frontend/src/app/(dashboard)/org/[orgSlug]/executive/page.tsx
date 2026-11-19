@@ -350,6 +350,14 @@ export default function SchoolExecutiveDashboardPage() {
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            <Link
+              href={`/org/${orgSlug}/attendance`}
+              className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-blue-500/10 hover:bg-blue-500/20 text-[#007AE6] text-xs font-bold transition-all flex items-center gap-1.5 active:scale-95 border border-[#0087FF]/20 shadow-2xs"
+              title="Buka Modul Presensi & Kiosk NFC"
+            >
+              <QrCode size={15} weight="bold" />
+              <span>Presensi & Kiosk NFC</span>
+            </Link>
             <button
               type="button"
               onClick={() => setShowTour(true)}

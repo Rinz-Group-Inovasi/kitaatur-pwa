@@ -114,7 +114,16 @@ export function requireOrgRole(allowedRoles: (org_member_role | 'auditor' | 'vic
       }
 
       if (!results || results.length === 0) {
-        return res.status(403).json({ error: 'Access denied: You are not a member of this organization' })
+        // Fallback: Pemilik organisasi (owner_id) otomatis memiliki peran 'head'
+        const orgs = isId
+          ? await prisma.$queryRawUnsafe<any[]>(`SELECT id, owner_id FROM public.organizations WHERE id = $1::uuid LIMIT 1`, orgIdOrSlug)
+          : await prisma.$queryRawUnsafe<any[]>(`SELECT id, owner_id FROM public.organizations WHERE LOWER(slug) = LOWER($1) LIMIT 1`, orgIdOrSlug)
+
+        if (orgs && orgs.length > 0 && orgs[0].owner_id === userId) {
+          results = [{ organization_id: orgs[0].id, role: 'head' }]
+        } else {
+          return res.status(403).json({ error: 'Access denied: You are not a member of this organization' })
+        }
       }
 
       const membership = results[0]
