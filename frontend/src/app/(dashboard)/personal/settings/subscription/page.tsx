@@ -480,9 +480,9 @@ export default function GoogleStyleSubscriptionPage() {
                         {/* Right: Actions */}
                         <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
                           {(sub as any).is_admin_bypass ? (
-                            <span className="px-3.5 py-1.5 rounded-full bg-gradient-to-r from-amber-500/15 to-orange-500/15 text-amber-800 border border-amber-300 text-xs font-black flex items-center gap-1.5 shadow-2xs">
-                              <ShieldCheck className="w-4 h-4 text-amber-600" />
-                              <span>👑 God Mode Aktif</span>
+                            <span className="px-3.5 py-1.5 rounded-full bg-[#E0F4FE] text-[#007AE6] border border-[#01C4FB]/40 text-xs font-bold flex items-center gap-1.5 shadow-2xs">
+                              <ShieldCheck className="w-4 h-4 text-[#0087FF]" />
+                              <span>Superadmin Bypass Aktif</span>
                             </span>
                           ) : (
                             <button

@@ -142,41 +142,41 @@ export default function NfcKioskPage() {
 
       const data = res.data
 
-      if (data.success) {
-        setLastResult({
-          student: data.student,
+      // Bunyikan Audio Chime Sesuai Status
+      if (soundEnabled) {
+        if (data.alreadyRecorded) {
+          kioskAudio.playDuplicate()
+        } else if (data.status === 'late') {
+          kioskAudio.playLate()
+        } else {
+          kioskAudio.playSuccess()
+        }
+      }
+
+      setLastResult({
+        student: data.student,
+        status: data.status,
+        checkInTime: data.checkInTime,
+        isCheckOut: data.isCheckOut,
+        alreadyRecorded: data.alreadyRecorded,
+        message: data.message
+      })
+
+      // Update Ticker Live Feed (tambahkan siswa ke antrian terbaru)
+      if (!data.alreadyRecorded && data.student) {
+        const newTap: RecentTap = {
+          id: data.student.id,
+          name: data.student.name,
+          identifier: data.student.identifier,
+          kelas: data.student.kelas,
           status: data.status,
           checkInTime: data.checkInTime || new Date().toISOString(),
-          isCheckOut: data.isCheckOut,
-          alreadyRecorded: data.alreadyRecorded,
-          message: data.message
-        })
-
-        // Mainkan efek suara
-        if (soundEnabled) {
-          if (data.alreadyRecorded) {
-            kioskAudio.playDuplicate()
-          } else if (data.status === 'late') {
-            kioskAudio.playLate()
-          } else {
-            kioskAudio.playSuccess()
-          }
+          type: data.student.type
         }
+        setRecentTaps(prev => [newTap, ...prev.slice(0, 9)])
 
-        // Update list recent taps secara instan di layar
-        if (!data.alreadyRecorded) {
-          const newEntry: RecentTap = {
-            id: `${Date.now()}`,
-            name: data.student.name,
-            identifier: data.student.identifier,
-            kelas: data.student.kelas,
-            status: data.status,
-            checkInTime: data.checkInTime || new Date().toISOString(),
-            type: data.student.type
-          }
-          setRecentTaps(prev => [newEntry, ...prev.slice(0, 9)])
-          
-          // Increment counter
+        // Update Counter Statistik
+        if (!data.isCheckOut) {
           setStats(prev => ({
             ...prev,
             presentCount: data.status === 'present' ? prev.presentCount + 1 : prev.presentCount,
@@ -194,7 +194,7 @@ export default function NfcKioskPage() {
       }
     } finally {
       setIsProcessing(false)
-      // Reset kartu notifikasi setelah 3 detik
+      // Reset kartu notifikasi setelah 3.2 detik
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current)
       dismissTimerRef.current = setTimeout(() => {
         setLastResult(null)
@@ -251,9 +251,9 @@ export default function NfcKioskPage() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showManualModal, sessionData, isProcessing, soundEnabled])
+  }, [showManualModal, sessionData, customSessionId, isProcessing, soundEnabled])
 
-  // Jaga agar input tersembunyi tetap terfokus saat klik di mana saja
+  // Menjaga agar input tersembunyi selalu fokus
   const keepFocus = () => {
     if (!showManualModal && inputRef.current) {
       inputRef.current.focus()
@@ -306,10 +306,10 @@ export default function NfcKioskPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-slate-950 text-white flex flex-col items-center justify-center p-6">
-        <RefreshCw className="w-10 h-10 text-blue-500 animate-spin mb-4" />
-        <h2 className="text-xl font-bold tracking-wide">Menyiapkan Kiosk Presensi NFC...</h2>
-        <p className="text-xs text-slate-400 mt-2">Menghubungkan ke sistem sekolah & terminal reader</p>
+      <div className="min-h-screen bg-[#F8FAFD] text-slate-800 flex flex-col items-center justify-center p-6">
+        <RefreshCw className="w-10 h-10 text-[#0087FF] animate-spin mb-4" />
+        <h2 className="text-xl font-extrabold text-slate-900 tracking-tight">Menyiapkan Kiosk Presensi NFC...</h2>
+        <p className="text-xs text-slate-500 mt-1">Menghubungkan ke sistem sekolah & terminal reader</p>
       </div>
     )
   }
@@ -317,8 +317,12 @@ export default function NfcKioskPage() {
   return (
     <div 
       onClick={keepFocus}
-      className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white select-none overflow-x-hidden flex flex-col justify-between"
+      className="min-h-screen bg-[#F8FAFD] text-slate-800 select-none overflow-x-hidden flex flex-col justify-between relative font-sans"
     >
+      {/* Ambient decorative soft blurs */}
+      <div className="absolute top-0 right-0 w-96 h-96 bg-[#0087FF]/5 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-96 h-96 bg-[#01C4FB]/5 rounded-full blur-3xl pointer-events-none" />
+
       {/* Hidden input to catch USB NFC Keystrokes reliably */}
       <input
         ref={inputRef}
@@ -329,18 +333,18 @@ export default function NfcKioskPage() {
       />
 
       {/* TOP HEADER */}
-      <header className="px-6 py-4 flex items-center justify-between border-b border-slate-800/80 bg-slate-950/60 backdrop-blur-md">
+      <header className="px-6 py-4 flex items-center justify-between border-b border-slate-200/80 bg-white/95 backdrop-blur-md shadow-2xs z-20">
         <div className="flex items-center gap-4">
           <Link
             href={`/org/${orgSlug}/attendance`}
-            className="p-2.5 rounded-xl bg-slate-800/60 hover:bg-slate-800 text-slate-300 hover:text-white transition flex items-center gap-2 text-xs font-bold"
+            className="p-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition flex items-center gap-2 text-xs font-bold active:scale-95"
           >
             <ArrowLeft className="w-4 h-4" />
             <span className="hidden sm:inline">Dasbor Presensi</span>
           </Link>
           
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-600/20 border border-blue-500/30 flex items-center justify-center font-bold text-blue-400 overflow-hidden">
+            <div className="w-10 h-10 rounded-2xl bg-[#E0F4FE] border border-[#01C4FB]/30 flex items-center justify-center font-bold text-[#007AE6] overflow-hidden shadow-2xs">
               {orgData?.logo_url ? (
                 <img src={orgData.logo_url} alt={orgData.name} className="w-full h-full object-cover" />
               ) : (
@@ -348,13 +352,13 @@ export default function NfcKioskPage() {
               )}
             </div>
             <div>
-              <h1 className="font-extrabold text-sm sm:text-base tracking-tight text-slate-100 flex items-center gap-2">
+              <h1 className="font-extrabold text-sm sm:text-base tracking-tight text-slate-900 flex items-center gap-2">
                 <span>{orgData?.name || 'Sekolah'}</span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30 font-bold uppercase">
+                <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-[#E0F4FE] text-[#007AE6] border border-[#01C4FB]/30 font-bold uppercase tracking-wider">
                   Terminal Gerbang
                 </span>
               </h1>
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-500 font-medium">
                 {sessionData ? sessionData.title : 'Sesi Presensi Harian'} • {currentDate}
               </p>
             </div>
@@ -365,24 +369,24 @@ export default function NfcKioskPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowManualModal(true)}
-            className="px-3.5 py-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-200 text-xs font-bold flex items-center gap-2 transition border border-slate-700/60 active:scale-95"
+            className="px-3.5 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center gap-2 transition border border-slate-200 shadow-2xs active:scale-95"
             title="Siswa tidak bawa kartu? Cari manual (F2)"
           >
-            <Search className="w-3.5 h-3.5 text-blue-400" />
+            <Search className="w-3.5 h-3.5 text-[#0087FF]" />
             <span className="hidden md:inline">Cari Manual (F2)</span>
           </button>
 
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
-            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-200 transition border border-slate-700/60"
+            className="p-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 transition border border-slate-200 shadow-2xs"
             title={soundEnabled ? 'Matikan Suara Beep' : 'Nyalakan Suara Beep'}
           >
-            {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
+            {soundEnabled ? <Volume2 className="w-4 h-4 text-emerald-600" /> : <VolumeX className="w-4 h-4 text-slate-400" />}
           </button>
 
           <button
             onClick={toggleFullscreen}
-            className="p-2.5 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-200 transition border border-slate-700/60"
+            className="p-2.5 rounded-xl bg-white hover:bg-slate-50 text-slate-700 transition border border-slate-200 shadow-2xs"
             title="Layar Penuh"
           >
             {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -391,21 +395,21 @@ export default function NfcKioskPage() {
       </header>
 
       {/* MAIN KIOSK BODY */}
-      <main className="flex-1 flex flex-col justify-center max-w-6xl w-full mx-auto px-6 py-6 space-y-8">
+      <main className="flex-1 flex flex-col justify-center max-w-6xl w-full mx-auto px-6 py-6 space-y-6 z-10">
         
         {/* JAM DIGITAL & STATISTIK ATAS */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-center">
           
           {/* Jam Raksasa */}
-          <div className="md:col-span-5 bg-slate-900/60 border border-slate-800/80 rounded-3xl p-6 text-center shadow-2xl backdrop-blur-md">
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-bold mb-3">
-              <Radio className="w-3.5 h-3.5 animate-pulse text-emerald-400" />
+          <div className="md:col-span-5 bg-white border border-slate-200/90 rounded-3xl p-6 text-center shadow-xs relative overflow-hidden">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-bold mb-3">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <span>TERMINAL AKTIF & SIAP TEMPEL</span>
             </div>
-            <div className="text-5xl sm:text-6xl font-black font-mono tracking-tight text-white mb-2">
+            <div className="text-5xl sm:text-6xl font-black font-mono tracking-tight text-slate-900 mb-2">
               {currentTime || '00:00:00'}
             </div>
-            <p className="text-xs sm:text-sm font-semibold text-slate-400">
+            <p className="text-xs sm:text-sm font-semibold text-slate-500">
               Waktu Indonesia Barat (WIB)
             </p>
           </div>
@@ -413,24 +417,24 @@ export default function NfcKioskPage() {
           {/* 4 Counter Statistik Kehadiran */}
           <div className="md:col-span-7 grid grid-cols-2 sm:grid-cols-4 gap-3.5">
             
-            <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 text-center">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 block mb-1">Total Siswa</span>
-              <span className="text-2xl sm:text-3xl font-black text-slate-100 font-mono">{stats.totalStudents}</span>
+            <div className="bg-white border border-slate-200/90 rounded-2xl p-4 text-center shadow-2xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1">Total Siswa</span>
+              <span className="text-2xl sm:text-3xl font-black text-slate-900 font-mono">{stats.totalStudents}</span>
             </div>
 
-            <div className="bg-emerald-950/30 border border-emerald-500/30 rounded-2xl p-4 text-center">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-400 block mb-1">Tepat Waktu</span>
-              <span className="text-2xl sm:text-3xl font-black text-emerald-400 font-mono">{stats.presentCount}</span>
+            <div className="bg-emerald-50/70 border border-emerald-200/80 rounded-2xl p-4 text-center shadow-2xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 block mb-1">Tepat Waktu</span>
+              <span className="text-2xl sm:text-3xl font-black text-emerald-600 font-mono">{stats.presentCount}</span>
             </div>
 
-            <div className="bg-amber-950/30 border border-amber-500/30 rounded-2xl p-4 text-center">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-400 block mb-1">Terlambat</span>
-              <span className="text-2xl sm:text-3xl font-black text-amber-400 font-mono">{stats.lateCount}</span>
+            <div className="bg-amber-50/70 border border-amber-200/80 rounded-2xl p-4 text-center shadow-2xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 block mb-1">Terlambat</span>
+              <span className="text-2xl sm:text-3xl font-black text-amber-600 font-mono">{stats.lateCount}</span>
             </div>
 
-            <div className="bg-rose-950/20 border border-rose-500/20 rounded-2xl p-4 text-center">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-400 block mb-1">Belum Hadir</span>
-              <span className="text-2xl sm:text-3xl font-black text-rose-400 font-mono">{stats.notYetCount}</span>
+            <div className="bg-rose-50/60 border border-rose-200/70 rounded-2xl p-4 text-center shadow-2xs">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-rose-700 block mb-1">Belum Hadir</span>
+              <span className="text-2xl sm:text-3xl font-black text-rose-600 font-mono">{stats.notYetCount}</span>
             </div>
 
           </div>
@@ -441,40 +445,47 @@ export default function NfcKioskPage() {
           
           {/* Skenario 1: Kartu Baru Ditempel (Visual Pop-Up Berhasil) */}
           {lastResult && (
-            <div className={`w-full max-w-xl p-8 rounded-3xl shadow-2xl border transition-all animate-in zoom-in-95 duration-200 text-center ${
+            <div className={`w-full max-w-xl p-8 rounded-3xl shadow-xl border-2 transition-all animate-in zoom-in-95 duration-200 text-center ${
               lastResult.alreadyRecorded
-                ? 'bg-blue-950/80 border-blue-500/50 shadow-blue-500/20'
+                ? 'bg-gradient-to-b from-white to-blue-50/40 border-blue-400 shadow-blue-500/10'
                 : lastResult.status === 'late'
-                ? 'bg-amber-950/80 border-amber-500/50 shadow-amber-500/20'
-                : 'bg-emerald-950/80 border-emerald-500/50 shadow-emerald-500/20'
+                ? 'bg-gradient-to-b from-white to-amber-50/40 border-amber-400 shadow-amber-500/10'
+                : 'bg-gradient-to-b from-white to-emerald-50/40 border-emerald-400 shadow-emerald-500/10'
             }`}>
               <div className="flex flex-col items-center">
-                <div className={`w-20 h-20 rounded-2xl flex items-center justify-center mb-4 shadow-xl text-3xl font-black ${
+                <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 shadow-lg text-3xl font-black ring-4 ring-white ${
                   lastResult.alreadyRecorded
-                    ? 'bg-blue-500 text-white shadow-blue-500/40'
+                    ? 'bg-[#0087FF] text-white shadow-blue-500/30'
                     : lastResult.status === 'late'
-                    ? 'bg-amber-500 text-slate-950 shadow-amber-500/40'
-                    : 'bg-emerald-500 text-white shadow-emerald-500/40'
+                    ? 'bg-amber-500 text-white shadow-amber-500/30'
+                    : 'bg-emerald-600 text-white shadow-emerald-600/30'
                 }`}>
                   {lastResult.student.name.charAt(0).toUpperCase()}
                 </div>
 
                 <div className="space-y-1 mb-4">
-                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
+                  <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
                     {lastResult.student.name}
                   </h2>
-                  <p className="text-sm font-semibold text-slate-300">
-                    {lastResult.student.kelas ? `Kelas ${lastResult.student.kelas} • ` : ''}NIS: {lastResult.student.identifier}
+                  <p className="text-sm font-semibold text-slate-600 flex items-center justify-center gap-2 flex-wrap">
+                    {lastResult.student.kelas && (
+                      <span className="bg-blue-50 text-[#0087FF] border border-blue-200 px-2.5 py-0.5 rounded-lg text-xs font-bold">
+                        Kelas {lastResult.student.kelas}
+                      </span>
+                    )}
+                    <span className="bg-slate-100 text-slate-600 px-2.5 py-0.5 rounded-lg text-xs font-mono">
+                      NIS: {lastResult.student.identifier}
+                    </span>
                   </p>
                 </div>
 
                 {/* Badge Status */}
-                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold uppercase tracking-wide border shadow-sm ${
+                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold uppercase tracking-wide border shadow-2xs ${
                   lastResult.alreadyRecorded
-                    ? 'bg-blue-500/20 text-blue-200 border-blue-400/40'
+                    ? 'bg-[#E0F4FE] text-[#007AE6] border-[#01C4FB]/40'
                     : lastResult.status === 'late'
-                    ? 'bg-amber-500/20 text-amber-200 border-amber-400/40'
-                    : 'bg-emerald-500/20 text-emerald-200 border-emerald-400/40'
+                    ? 'bg-amber-100 text-amber-900 border-amber-300'
+                    : 'bg-emerald-100 text-emerald-800 border-emerald-300'
                 }`}>
                   {lastResult.status === 'late' ? <Clock className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
                   <span>{lastResult.message}</span>
@@ -485,12 +496,12 @@ export default function NfcKioskPage() {
 
           {/* Skenario 2: Error / Kartu Belum Terdaftar */}
           {!lastResult && errorMessage && (
-            <div className="w-full max-w-xl p-8 rounded-3xl bg-rose-950/80 border border-rose-500/50 shadow-2xl shadow-rose-500/20 text-center animate-in shake duration-200">
-              <div className="w-16 h-16 rounded-2xl bg-rose-500/20 text-rose-400 border border-rose-500/30 flex items-center justify-center mx-auto mb-4">
+            <div className="w-full max-w-xl p-8 rounded-3xl bg-rose-50 border-2 border-rose-300 shadow-xl shadow-rose-500/10 text-center animate-in shake duration-200">
+              <div className="w-16 h-16 rounded-2xl bg-rose-100 text-rose-600 border border-rose-200 flex items-center justify-center mx-auto mb-4">
                 <AlertCircle className="w-8 h-8" />
               </div>
-              <h3 className="text-xl font-bold text-rose-100 mb-1">Kartu Tidak Dikenali</h3>
-              <p className="text-xs sm:text-sm text-rose-300 max-w-md mx-auto leading-relaxed">
+              <h3 className="text-xl font-extrabold text-rose-900 mb-1">Kartu Tidak Dikenali</h3>
+              <p className="text-xs sm:text-sm text-rose-700 max-w-md mx-auto leading-relaxed">
                 {errorMessage}
               </p>
             </div>
@@ -498,19 +509,18 @@ export default function NfcKioskPage() {
 
           {/* Skenario 3: Idle / Standby Siap Tempel Kartu */}
           {!lastResult && !errorMessage && (
-            <div className="w-full max-w-xl p-10 rounded-3xl bg-slate-900/40 border border-slate-800/60 shadow-xl text-center flex flex-col items-center">
-              <div className="relative mb-6">
-                <div className="w-24 h-24 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center animate-pulse">
-                  <CreditCard className="w-10 h-10 text-blue-400" />
+            <div className="w-full max-w-xl p-10 rounded-3xl bg-white border-2 border-dashed border-[#0087FF]/40 shadow-xs text-center flex flex-col items-center">
+              <div className="relative mb-5">
+                <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-[#E0F4FE] to-[#BAE6FD]/60 text-[#0087FF] flex items-center justify-center shadow-inner ring-8 ring-[#E0F4FE]/70 animate-pulse">
+                  <CreditCard className="w-11 h-11 text-[#0087FF]" />
                 </div>
-                <div className="absolute inset-0 rounded-full border border-blue-400/30 animate-ping opacity-30" />
               </div>
 
-              <h3 className="text-xl sm:text-2xl font-black text-slate-100 mb-2 tracking-tight">
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-2 tracking-tight">
                 Silakan Tempelkan Kartu NFC Siswa
               </h3>
-              <p className="text-xs sm:text-sm text-slate-400 max-w-sm leading-relaxed">
-                Dekatkan kartu ke sensor USB reader. Data kehadiran siswa akan otomatis dicatat seketika.
+              <p className="text-xs sm:text-sm text-slate-500 max-w-sm leading-relaxed font-medium">
+                Dekatkan kartu ke sensor USB reader. Data kehadiran siswa otomatis dicatat seketika tanpa perlu menekan tombol.
               </p>
             </div>
           )}
@@ -520,11 +530,11 @@ export default function NfcKioskPage() {
         {/* DAFTAR SISWA YANG BARU SAJA TAP (ROLLING FEED) */}
         <div>
           <div className="flex items-center justify-between mb-3 px-1">
-            <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
-              <Sparkles className="w-3.5 h-3.5 text-blue-400" />
-              <span>Aktivitas Tap Terakhir (Live Feed)</span>
+            <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+              <Sparkles className="w-3.5 h-3.5 text-[#0087FF]" />
+              <span>Aktivitas Tap Terkini (Live Feed)</span>
             </h4>
-            <span className="text-[11px] text-slate-500 font-semibold">10 Siswa Terakhir</span>
+            <span className="text-[11px] text-slate-400 font-semibold">10 Siswa Terakhir</span>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -532,23 +542,25 @@ export default function NfcKioskPage() {
               recentTaps.map((item, idx) => (
                 <div 
                   key={`${item.id}-${idx}`}
-                  className="bg-slate-900/50 border border-slate-800/80 rounded-2xl p-3 flex flex-col justify-between hover:border-slate-700 transition"
+                  className="bg-white border border-slate-200/90 rounded-2xl p-3 flex flex-col justify-between hover:border-slate-300 shadow-2xs transition"
                 >
                   <div className="flex items-center gap-2 mb-2">
-                    <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-300 font-bold text-xs flex items-center justify-center shrink-0">
+                    <div className="w-7 h-7 rounded-lg bg-[#E0F4FE] text-[#007AE6] font-bold text-xs flex items-center justify-center shrink-0">
                       {item.name.charAt(0).toUpperCase()}
                     </div>
                     <div className="overflow-hidden">
-                      <p className="font-bold text-xs text-slate-200 truncate">{item.name}</p>
+                      <p className="font-bold text-xs text-slate-900 truncate">{item.name}</p>
                       <p className="text-[10px] text-slate-500 truncate">{item.kelas || item.identifier}</p>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between pt-1.5 border-t border-slate-800/60 text-[10px]">
-                    <span className="font-mono text-slate-400">
+                  <div className="flex items-center justify-between pt-1.5 border-t border-slate-100 text-[10px]">
+                    <span className="font-mono text-slate-500 font-medium">
                       {new Date(item.checkInTime).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}
                     </span>
-                    <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] uppercase ${
-                      item.status === 'late' ? 'bg-amber-500/20 text-amber-300' : 'bg-emerald-500/20 text-emerald-300'
+                    <span className={`font-bold px-1.5 py-0.5 rounded text-[9px] uppercase border ${
+                      item.status === 'late' 
+                        ? 'bg-amber-50 text-amber-700 border-amber-200' 
+                        : 'bg-emerald-50 text-emerald-700 border-emerald-200'
                     }`}>
                       {item.status === 'late' ? 'Telat' : 'Hadir'}
                     </span>
@@ -556,7 +568,7 @@ export default function NfcKioskPage() {
                 </div>
               ))
             ) : (
-              <div className="col-span-full py-6 text-center text-xs text-slate-500 bg-slate-900/30 rounded-2xl border border-dashed border-slate-800">
+              <div className="col-span-full py-6 text-center text-xs text-slate-500 bg-white rounded-2xl border border-dashed border-slate-200">
                 Belum ada siswa yang melakukan presensi pada sesi ini.
               </div>
             )}
@@ -566,23 +578,23 @@ export default function NfcKioskPage() {
       </main>
 
       {/* FOOTER KIOSK */}
-      <footer className="px-6 py-3 border-t border-slate-800/60 bg-slate-950/60 text-center text-[11px] text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2">
+      <footer className="px-6 py-3 border-t border-slate-200/80 bg-white/80 text-center text-[11px] text-slate-500 flex flex-col sm:flex-row items-center justify-between gap-2 z-20">
         <span>KitaAtur Edu • Sistem Presensi Cepat Kartu NFC Sekolah</span>
         <span>Tips: Jika reader USB terputus, cabut dan colokkan kembali kabel USB ke laptop/PC.</span>
       </footer>
 
       {/* MODAL PENCARIAN MANUAL (JIKA SISWA LUPA BAWA KARTU - F2) */}
       {showManualModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-150">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-3xl p-6 shadow-2xl space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-lg bg-white border border-slate-200 rounded-3xl p-6 shadow-2xl space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-[#E0F4FE] text-[#007AE6] flex items-center justify-center">
                   <Search className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-white text-base">Presensi Manual Siswa</h3>
-                  <p className="text-xs text-slate-400">Untuk siswa yang lupa atau kehilangan kartu</p>
+                  <h3 className="font-extrabold text-slate-900 text-base">Presensi Manual Siswa</h3>
+                  <p className="text-xs text-slate-500 font-medium">Untuk siswa yang lupa atau kehilangan kartu</p>
                 </div>
               </div>
               <button
@@ -591,7 +603,7 @@ export default function NfcKioskPage() {
                   setManualQuery('')
                   setManualResults([])
                 }}
-                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -605,30 +617,30 @@ export default function NfcKioskPage() {
                   value={manualQuery}
                   onChange={(e) => handleManualSearch(e.target.value)}
                   placeholder="Ketik Nama Siswa atau NIS..."
-                  className="w-full pl-10 pr-4 py-3 bg-slate-950 border border-slate-700 rounded-xl text-sm text-white placeholder-slate-500 outline-none focus:border-blue-500 transition"
+                  className="w-full pl-10 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-900 placeholder-slate-400 outline-none focus:border-[#0087FF] focus:ring-2 focus:ring-[#0087FF]/20 transition"
                   autoFocus
                 />
               </div>
             </div>
 
-            <div className="max-h-60 overflow-y-auto space-y-2 divide-y divide-slate-800/50">
+            <div className="max-h-60 overflow-y-auto space-y-2 divide-y divide-slate-100">
               {manualSearching ? (
-                <div className="py-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-400" />
+                <div className="py-6 text-center text-xs text-slate-500 flex items-center justify-center gap-2">
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#0087FF]" />
                   <span>Mencari data siswa...</span>
                 </div>
               ) : manualResults.length > 0 ? (
                 manualResults.map((s) => (
                   <div key={s.id} className="pt-2 flex items-center justify-between">
                     <div>
-                      <p className="font-bold text-sm text-slate-100">{s.name}</p>
-                      <p className="text-xs text-slate-400">
+                      <p className="font-bold text-sm text-slate-900">{s.name}</p>
+                      <p className="text-xs text-slate-500">
                         {s.kelas ? `Kelas ${s.kelas} • ` : ''}NIS: {s.identifier}
                       </p>
                     </div>
                     <button
                       onClick={() => handleManualCheckIn(s)}
-                      className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition active:scale-95 shadow-sm"
+                      className="px-3.5 py-1.5 bg-[#0087FF] hover:bg-[#0077E6] text-white rounded-xl text-xs font-bold transition active:scale-95 shadow-sm"
                     >
                       Hadirkan
                     </button>
@@ -645,7 +657,7 @@ export default function NfcKioskPage() {
               )}
             </div>
 
-            <div className="pt-2 border-t border-slate-800 flex justify-end">
+            <div className="pt-2 border-t border-slate-100 flex justify-end">
               <button
                 type="button"
                 onClick={() => {
@@ -653,7 +665,7 @@ export default function NfcKioskPage() {
                   setManualQuery('')
                   setManualResults([])
                 }}
-                className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-white"
+                className="px-4 py-2 text-xs font-bold text-slate-500 hover:text-slate-800 transition-colors"
               >
                 Tutup (Esc)
               </button>
@@ -664,4 +676,3 @@ export default function NfcKioskPage() {
     </div>
   )
 }
-

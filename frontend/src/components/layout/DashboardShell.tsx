@@ -384,8 +384,9 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   // Same for bottom navigation
   const activeBottomNavItems = isOrg ? orgNavItems : personalNavItems
 
+  const isKiosk = Boolean(pathname?.includes('/attendance/kiosk'))
   const noShellPaths = ['/org/create']
-  if (pathname && noShellPaths.includes(pathname)) {
+  if (pathname && (noShellPaths.includes(pathname) || isKiosk)) {
     return <>{children}</>
   }
 
