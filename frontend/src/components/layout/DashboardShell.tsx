@@ -171,20 +171,24 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
   const currentOrgInfo = (currentOrgSlug ? store.orgs.find(o => o.slug === currentOrgSlug) : null) || directOrgInfo
 
-  const isCurrentSchool = Boolean(
-    pathname?.includes('/executive') || 
-    currentOrgInfo?.is_edu || 
-    ((currentOrgInfo?._count?.school_links_as_school || 0) > 0) ||
-    isSchoolCached
-  )
+  const isCurrentSchool = currentOrgInfo
+    ? Boolean(currentOrgInfo.is_edu || ((currentOrgInfo._count?.school_links_as_school || 0) > 0))
+    : isSchoolCached
 
   useEffect(() => {
-    if (currentOrgSlug && isCurrentSchool) {
+    if (currentOrgSlug && currentOrgInfo) {
+      const isSchool = Boolean(currentOrgInfo.is_edu || ((currentOrgInfo._count?.school_links_as_school || 0) > 0))
+      setIsSchoolCached(isSchool)
       try {
-        localStorage.setItem(`kitaatur_is_school_${currentOrgSlug}`, 'true')
+        if (isSchool) {
+          localStorage.setItem(`kitaatur_is_school_${currentOrgSlug}`, 'true')
+        } else {
+          localStorage.setItem(`kitaatur_is_school_${currentOrgSlug}`, 'false')
+          localStorage.removeItem(`kitaatur_is_school_${currentOrgSlug}`)
+        }
       } catch (e) {}
     }
-  }, [currentOrgSlug, isCurrentSchool])
+  }, [currentOrgSlug, currentOrgInfo])
 
   // Fetch org metadata if not in store to ensure consistent school branding & navigation
   useEffect(() => {
@@ -196,10 +200,15 @@ export default function DashboardShell({ children }: DashboardShellProps) {
     const fromStore = store.orgs.find(o => o.slug === currentOrgSlug)
     if (fromStore) {
       setDirectOrgInfo(fromStore)
+      const isSchool = Boolean(fromStore.is_edu || ((fromStore._count?.school_links_as_school || 0) > 0))
+      setIsSchoolCached(isSchool)
       try {
         localStorage.setItem(`kitaatur_org_meta_${currentOrgSlug}`, JSON.stringify(fromStore))
-        if (fromStore.is_edu || ((fromStore._count?.school_links_as_school || 0) > 0)) {
+        if (isSchool) {
           localStorage.setItem(`kitaatur_is_school_${currentOrgSlug}`, 'true')
+        } else {
+          localStorage.setItem(`kitaatur_is_school_${currentOrgSlug}`, 'false')
+          localStorage.removeItem(`kitaatur_is_school_${currentOrgSlug}`)
         }
       } catch (e) {}
       return
@@ -211,10 +220,15 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         if (res.data?.org) {
           const org = res.data.org
           setDirectOrgInfo(org)
+          const isSchool = Boolean(org.is_edu || ((org._count?.school_links_as_school || 0) > 0))
+          setIsSchoolCached(isSchool)
           try {
             localStorage.setItem(`kitaatur_org_meta_${currentOrgSlug}`, JSON.stringify(org))
-            if (org.is_edu || ((org._count?.school_links_as_school || 0) > 0)) {
+            if (isSchool) {
               localStorage.setItem(`kitaatur_is_school_${currentOrgSlug}`, 'true')
+            } else {
+              localStorage.setItem(`kitaatur_is_school_${currentOrgSlug}`, 'false')
+              localStorage.removeItem(`kitaatur_is_school_${currentOrgSlug}`)
             }
           } catch (e) {}
         }
@@ -223,18 +237,23 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         api.get(`/org/${currentOrgSlug}/settings`)
           .then(res => {
             if (res.data) {
+              const isSchool = Boolean(res.data.is_edu || ((res.data.school_links_as_school || 0) > 0))
               const meta = {
                 name: res.data.name || currentOrgSlug,
                 slug: currentOrgSlug,
                 logo_url: res.data.logo_url || null,
-                is_edu: res.data.is_edu,
+                is_edu: Boolean(res.data.is_edu),
                 _count: { school_links_as_school: res.data.school_links_as_school || 0 }
               }
               setDirectOrgInfo(meta)
+              setIsSchoolCached(isSchool)
               try {
                 localStorage.setItem(`kitaatur_org_meta_${currentOrgSlug}`, JSON.stringify(meta))
-                if (res.data.is_edu) {
+                if (isSchool) {
                   localStorage.setItem(`kitaatur_is_school_${currentOrgSlug}`, 'true')
+                } else {
+                  localStorage.setItem(`kitaatur_is_school_${currentOrgSlug}`, 'false')
+                  localStorage.removeItem(`kitaatur_is_school_${currentOrgSlug}`)
                 }
               } catch (e) {}
             }
@@ -298,11 +317,9 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
   const primaryOrgSlug = currentOrgSlug || lastOrgSlug || (store.orgs.length > 0 ? store.orgs[0].slug : null)
   const primaryOrgInfo = (primaryOrgSlug ? store.orgs.find(o => o.slug === primaryOrgSlug) : null) || (primaryOrgSlug === currentOrgSlug ? directOrgInfo : null)
-  const isPrimarySchool = Boolean(
-    primaryOrgInfo?.is_edu || 
-    ((primaryOrgInfo?._count?.school_links_as_school || 0) > 0) ||
-    (primaryOrgSlug === currentOrgSlug ? isSchoolCached : false)
-  )
+  const isPrimarySchool = primaryOrgInfo
+    ? Boolean(primaryOrgInfo.is_edu || ((primaryOrgInfo._count?.school_links_as_school || 0) > 0))
+    : (primaryOrgSlug === currentOrgSlug ? isSchoolCached : false)
 
   // Menentukan nav item berdasarkan konteks
   const personalNavItems = [

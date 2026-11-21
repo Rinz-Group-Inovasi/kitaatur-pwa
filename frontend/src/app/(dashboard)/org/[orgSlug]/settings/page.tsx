@@ -212,6 +212,14 @@ export default function OrgSettingsPage() {
           }
           if (settingsRes.data.is_edu !== undefined) {
             setIsSchool(settingsRes.data.is_edu)
+            try {
+              if (settingsRes.data.is_edu) {
+                localStorage.setItem(`kitaatur_is_school_${orgSlug}`, 'true')
+              } else {
+                localStorage.setItem(`kitaatur_is_school_${orgSlug}`, 'false')
+                localStorage.removeItem(`kitaatur_is_school_${orgSlug}`)
+              }
+            } catch (e) {}
           }
           if (settingsRes.data.edu_pin) {
             setSchoolPin(settingsRes.data.edu_pin)
@@ -390,7 +398,25 @@ export default function OrgSettingsPage() {
         is_edu: isSchool,
         edu_pin: schoolPin 
       })
+
+      // Update localStorage & store instantly
+      try {
+        if (isSchool) {
+          localStorage.setItem(`kitaatur_is_school_${orgSlug}`, 'true')
+        } else {
+          localStorage.setItem(`kitaatur_is_school_${orgSlug}`, 'false')
+          localStorage.removeItem(`kitaatur_is_school_${orgSlug}`)
+        }
+        localStorage.removeItem(`kitaatur_org_meta_${orgSlug}`)
+      } catch (e) {}
+
+      await store.refreshOrgs()
       toast.success('Profil organisasi berhasil disimpan.')
+
+      // Jika versi school dimatikan, pastikan navigasi sinkron
+      if (!isSchool && typeof window !== 'undefined' && window.location.pathname.includes('/executive')) {
+        router.replace(`/org/${orgSlug}/dashboard`)
+      }
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Gagal menyimpan profil organisasi')
     } finally {

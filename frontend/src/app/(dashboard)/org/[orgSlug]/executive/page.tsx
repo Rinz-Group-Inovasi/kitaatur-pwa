@@ -71,6 +71,15 @@ export default function SchoolExecutiveDashboardPage() {
     if (isManualRefresh) setRefreshing(true)
     try {
       const res = await api.get(`/org/${orgSlug}/school/executive-overview`)
+      // If organization is not actually a school (is_edu: false and no linked orgs), redirect back to normal org dashboard
+      if (res.data?.is_school === false || (!res.data?.school?.is_edu && (res.data?.summary?.total_ekskul || 0) === 0)) {
+        try {
+          localStorage.removeItem(`kitaatur_is_school_${orgSlug}`)
+          localStorage.setItem(`kitaatur_is_school_${orgSlug}`, 'false')
+        } catch (e) {}
+        router.replace(`/org/${orgSlug}/dashboard`)
+        return
+      }
       setData(res.data)
     } catch (err: any) {
       console.error('Error fetching executive data:', err)

@@ -18,6 +18,7 @@ export async function getSchoolExecutiveOverview(req: Request, res: Response) {
         name: true,
         slug: true,
         logo_url: true,
+        is_edu: true,
       }
     })
 
@@ -219,9 +220,11 @@ export async function getSchoolExecutiveOverview(req: Request, res: Response) {
       ? Math.round(attendanceRates.reduce((a, b) => a + b, 0) / attendanceRates.length)
       : 0
 
+    const hasLinkedOrgs = linkedLinks.length > 0
     return res.status(200).json({
       school,
-      has_linked_orgs: true,
+      is_school: Boolean(school.is_edu || hasLinkedOrgs),
+      has_linked_orgs: hasLinkedOrgs,
       summary: {
         total_ekskul: linkedLinks.length,
         total_students: totalStudents,
