@@ -9,11 +9,63 @@ import pino from 'pino';
 import QRCode from 'qrcode';
 import path from 'path';
 import fs from 'fs';
+import crypto from 'crypto';
 import { prisma } from '../config/db';
 
 const activeSockets = new Map<string, WASocket>();
 const qrDataUrls = new Map<string, string>();
 const reconnectTimeouts = new Map<string, NodeJS.Timeout>();
+
+// ==========================================
+// ANTI-BAN & SPAM-PREVENTION ENGINE
+// ==========================================
+interface QueueItem {
+  toPhone: string;
+  text: string;
+  resolve: (val: boolean) => void;
+}
+
+// In-memory queue per sekolah agar pengiriman terurut (tidak meledak serempak)
+const outboundQueues = new Map<string, QueueItem[]>();
+const isProcessingQueue = new Map<string, boolean>();
+
+// Deduplikasi notifikasi agar orang tua tidak di-spam berulang dalam 5 menit
+const dedupCache = new Map<string, number>();
+
+// Jitter delay acak untuk mensimulasikan jeda ketik alami manusia (1500 - 3500ms)
+const randomJitter = (minMs = 1500, maxMs = 3500) => {
+  const ms = Math.floor(Math.random() * (maxMs - minMs + 1)) + minMs;
+  return new Promise((resolve) => setTimeout(resolve, ms));
+};
+
+// Variasi sapaan agar pesan tidak terdeteksi sebagai broadcast template yang identik
+function getRandomGreeting(): string {
+  const greetings = [
+    'Yth. Bapak/Ibu Orang Tua / Wali dari:',
+    'Yth. Orang Tua / Wali dari:',
+    'Halo Ayah/Bunda dari ananda:',
+    'Assalamu’alaikum Wr. Wb. Yth. Wali dari:',
+    'Selamat pagi/siang Bapak/Ibu Wali dari:'
+  ];
+  return greetings[Math.floor(Math.random() * greetings.length)];
+}
+
+function getRandomClosing(): string {
+  const closings = [
+    'Semoga ananda menjalani hari belajar yang berkah dan produktif.',
+    'Terima kasih atas kerja sama dan bimbingan Ayah/Bunda di rumah.',
+    'Semoga sehat dan sukses selalu untuk keluarga tercinta.',
+    'Salam hangat dari keluarga besar sekolah.',
+    'Mari bersama mendampingi tumbuh kembang ananda tercinta.'
+  ];
+  return closings[Math.floor(Math.random() * closings.length)];
+}
+
+// Signature hash acak unik di tiap pesan (Anti-Heuristic Meta Classifier)
+function getMessageSignature(): string {
+  const ref = crypto.randomBytes(3).toString('hex').toUpperCase();
+  return `_Ref: #${ref}_`;
+}
 
 export function normalizePhoneNumber(rawPhone: string): string {
   let cleaned = rawPhone.replace(/\D/g, '');
@@ -373,24 +425,89 @@ export async function disconnectWhatsAppSession(organizationId: string) {
   return { success: true, message: 'WhatsApp session disconnected' };
 }
 
-// Pengiriman Pesan Mandiri (General)
+// Pemrosesan Antrean Terjadwal dengan Jitter & Human Typing (Anti-Ban Engine)
+async function processOrgQueue(organizationId: string) {
+  if (isProcessingQueue.get(organizationId)) return;
+
+  isProcessingQueue.set(organizationId, true);
+  const queue = outboundQueues.get(organizationId) || [];
+
+  try {
+    while (queue.length > 0) {
+      const item = queue.shift();
+      if (!item) break;
+
+      const sock = activeSockets.get(organizationId);
+      if (!sock) {
+        item.resolve(false);
+        continue;
+      }
+
+      const normalized = normalizePhoneNumber(item.toPhone);
+      const jid = `${normalized}@s.whatsapp.net`;
+
+      try {
+        // 1. Kirim presence update 'composing' (simulasi mengetik)
+        try {
+          await sock.sendPresenceUpdate('composing', jid);
+        } catch (e) {}
+
+        // 2. Typing delay alami (600ms - 1400ms)
+        await randomJitter(600, 1400);
+
+        // 3. Kirim pesan ke WhatsApp
+        await sock.sendMessage(jid, { text: item.text });
+
+        // 4. Hentikan presence update
+        try {
+          await sock.sendPresenceUpdate('paused', jid);
+        } catch (e) {}
+
+        item.resolve(true);
+
+        // 5. Anti-burst delay antar pesan berikutnya (1800ms - 3500ms)
+        // Menjaga agar pengiriman tidak terdeteksi sebagai spam broadcast burst
+        if (queue.length > 0) {
+          await randomJitter(1800, 3500);
+        }
+      } catch (err: any) {
+        console.error(`[WhatsApp Anti-Ban Queue] Failed sending to ${jid}:`, err);
+        const isRateLimit = err?.output?.statusCode === 429 || err?.message?.includes('rate-limit');
+        if (isRateLimit) {
+          console.warn(`[WhatsApp Anti-Ban] Rate limit hit on org ${organizationId}. Cooling down 30s...`);
+          await new Promise((r) => setTimeout(r, 30000));
+        }
+        item.resolve(false);
+      }
+    }
+  } finally {
+    isProcessingQueue.set(organizationId, false);
+  }
+}
+
+// Pengiriman Pesan Mandiri (dengan Outbound Queue & Throttle)
 export async function sendWhatsAppMessage(organizationId: string, toPhone: string, text: string): Promise<boolean> {
   const sock = activeSockets.get(organizationId);
   if (!sock) return false;
 
-  const normalized = normalizePhoneNumber(toPhone);
-  const jid = `${normalized}@s.whatsapp.net`;
+  if (!outboundQueues.has(organizationId)) {
+    outboundQueues.set(organizationId, []);
+  }
 
-  try {
-    await sock.sendMessage(jid, { text });
-    return true;
-  } catch (err) {
-    console.error(`[WhatsApp] Failed to send message to ${jid}:`, err);
+  const queue = outboundQueues.get(organizationId)!;
+  // Batasi antrean maksimal 500 pesan agar memory tidak membengkak
+  if (queue.length > 500) {
+    console.warn(`[WhatsApp Queue] Queue overflow on org ${organizationId}, dropping message.`);
     return false;
   }
+
+  return new Promise<boolean>((resolve) => {
+    queue.push({ toPhone, text, resolve });
+    processOrgQueue(organizationId).catch(console.error);
+  });
 }
 
-// Notifikasi Presensi Siswa Otomatis ke Orang Tua
+// Notifikasi Presensi Siswa Otomatis ke Orang Tua (dengan Spintax & Dedup)
 export async function sendAttendanceNotification(
   organizationId: string,
   student: {
@@ -417,14 +534,31 @@ export async function sendAttendanceNotification(
     }
 
     if (!parentPhone) {
-      // Siswa belum ditautkan nomor WA orang tua
       return false;
     }
 
     const sock = activeSockets.get(organizationId);
     if (!sock) {
-      // Bot sekolah belum aktif/terhubung
       return false;
+    }
+
+    // 1. Anti-Spam Deduplication: cegah duplikasi notifikasi identik untuk siswa yang sama dalam kurun waktu 5 menit
+    const todayStr = time.toISOString().split('T')[0];
+    const dedupKey = `${organizationId}:${student.id}:${type}:${todayStr}`;
+    const nowMs = Date.now();
+    const lastSent = dedupCache.get(dedupKey);
+
+    if (lastSent && nowMs - lastSent < 5 * 60 * 1000) {
+      console.log(`[WhatsApp Anti-Ban] Dropped duplicate ${type} notification for student ${student.name}`);
+      return true;
+    }
+    dedupCache.set(dedupKey, nowMs);
+
+    // Pembersihan berkala cache (memory leak prevention)
+    if (dedupCache.size > 2000) {
+      for (const [k, v] of dedupCache.entries()) {
+        if (nowMs - v > 15 * 60 * 1000) dedupCache.delete(k);
+      }
     }
 
     const dateFormatted = time.toLocaleDateString('id-ID', {
@@ -453,8 +587,12 @@ export async function sendAttendanceNotification(
     }
 
     const kelasInfo = student.kelas ? `\n🏫 *Kelas:* ${student.kelas}` : '';
+    const greeting = getRandomGreeting();
+    const closing = getRandomClosing();
+    const sig = getMessageSignature();
 
-    const message = `${icon} *NOTIFIKASI KEHADIRAN SISWA*\n----------------------------------------\nYth. Orang Tua / Wali dari:\n👤 *Nama:* ${student.name}\n🏷️ *NIS:* ${student.identifier}${kelasInfo}\n\n📅 *Hari / Tanggal:* ${dateFormatted}\n⏰ *Waktu:* ${timeFormatted} WIB\n📍 *Status:* ${actionLabel} (${statusText})\n\n----------------------------------------\n_Pesan otomatis ini dikirimkan langsung oleh Sistem Presensi Gerbang KitaAtur School._\n_Ketik *CEK* untuk info detail kehadiran & poin ananda._`;
+    // Pesan menggunakan Spintax acak + unique hash signature agar teks tidak dianggap copy-paste spam oleh Meta
+    const message = `${icon} *NOTIFIKASI KEHADIRAN SISWA*\n----------------------------------------\n${greeting}\n👤 *Nama:* ${student.name}\n🏷️ *NIS:* ${student.identifier}${kelasInfo}\n\n📅 *Hari / Tanggal:* ${dateFormatted}\n⏰ *Waktu:* ${timeFormatted} WIB\n📍 *Status:* ${actionLabel} (${statusText})\n\n_${closing}_\n----------------------------------------\n_Pesan otomatis Sistem Presensi Gerbang KitaAtur School._\n_Ketik *CEK* untuk cek detail ananda._\n${sig}`;
 
     return await sendWhatsAppMessage(organizationId, parentPhone, message);
   } catch (err) {
@@ -463,7 +601,7 @@ export async function sendAttendanceNotification(
   }
 }
 
-// Notifikasi Pelanggaran Siswa ke Orang Tua
+// Notifikasi Pelanggaran Siswa ke Orang Tua (dengan Spintax & Anti-Burst)
 export async function sendViolationNotification(
   organizationId: string,
   student: {
@@ -506,8 +644,10 @@ export async function sendViolationNotification(
     const kelasInfo = student.kelas ? `\n🏫 *Kelas:* ${student.kelas}` : '';
     const tindakan = violation.action_taken ? `\n🛠️ *Tindakan BK:* ${violation.action_taken}` : '';
     const catatan = violation.notes ? `\n📝 *Catatan:* ${violation.notes}` : '';
+    const greeting = getRandomGreeting();
+    const sig = getMessageSignature();
 
-    const message = `⚠️ *PEMBERITAHUAN PELANGGARAN SISWA*\n----------------------------------------\nYth. Orang Tua / Wali dari:\n👤 *Nama:* ${student.name}\n🏷️ *NIS:* ${student.identifier}${kelasInfo}\n\nAnanda baru saja dicatat melakukan pelanggaran tata tertib sekolah:\n📌 *Pelanggaran:* ${violation.title}\n📊 *Kategori:* ${violation.category.toUpperCase()} (+${violation.points} Poin)${tindakan}${catatan}\n\n⚠️ *Total Akumulasi Poin Pelanggaran:* ${total} Poin\n\n----------------------------------------\n_Mohon bimbingan dan perhatian orang tua di rumah. Jika ada pertanyaan atau butuh klarifikasi, silakan berkonsultasi dengan Guru Bimbingan Konseling (BK) di sekolah._`;
+    const message = `⚠️ *PEMBERITAHUAN PELANGGARAN SISWA*\n----------------------------------------\n${greeting}\n👤 *Nama:* ${student.name}\n🏷️ *NIS:* ${student.identifier}${kelasInfo}\n\nAnanda baru saja dicatat melakukan pelanggaran tata tertib sekolah:\n📌 *Pelanggaran:* ${violation.title}\n📊 *Kategori:* ${violation.category.toUpperCase()} (+${violation.points} Poin)${tindakan}${catatan}\n\n⚠️ *Total Akumulasi Poin Pelanggaran:* ${total} Poin\n\n----------------------------------------\n_Mohon bimbingan dan perhatian orang tua di rumah. Jika ada pertanyaan atau butuh klarifikasi, silakan berkonsultasi dengan Guru Bimbingan Konseling (BK) di sekolah._\n${sig}`;
 
     return await sendWhatsAppMessage(organizationId, parentPhone, message);
   } catch (err) {
@@ -535,3 +675,4 @@ export async function initActiveWhatsAppSessions() {
     console.error('[WhatsApp] Error initializing active sessions:', err);
   }
 }
+
