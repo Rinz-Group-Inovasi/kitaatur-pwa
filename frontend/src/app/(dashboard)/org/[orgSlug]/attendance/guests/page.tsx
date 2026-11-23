@@ -164,31 +164,228 @@ function GuestsContent() {
         const XLSX = await import('xlsx')
         const bstr = evt.target?.result
         const wb = XLSX.read(bstr, { type: 'binary' })
-        const wsname = wb.SheetNames[0]
-        const ws = wb.Sheets[wsname]
-        const data = XLSX.utils.sheet_to_json(ws, { raw: false })
 
-        // Parse data
-        const payload = data.map((row: any) => ({
-          name: String(row['Nama'] || row['nama'] || row['Name'] || row['name'] || '').trim(),
-          identifier: String(row['ID'] || row['id'] || row['Identifier'] || row['NIM'] || row['nim'] || row['NIK'] || row['NIS'] || row['nis'] || '').trim(),
-          kelas: row['Kelas'] || row['kelas'] || row['Class'] || row['class'] ? String(row['Kelas'] || row['kelas'] || row['Class'] || row['class']).trim() : null,
-          nfc_uid: row['NFC_UID'] || row['nfc_uid'] || row['NFC'] || row['nfc'] || row['UID'] || row['uid'] ? String(row['NFC_UID'] || row['nfc_uid'] || row['NFC'] || row['nfc'] || row['UID'] || row['uid']).trim() : null,
-          parent_phone: row['No_WA_Ortu'] || row['no_wa_ortu'] || row['WA_Ortu'] || row['wa_ortu'] || row['Nomor_WA'] || row['nomor_wa'] || row['Telepon_Ortu'] || row['telepon_ortu'] || row['No_WA'] ? String(row['No_WA_Ortu'] || row['no_wa_ortu'] || row['WA_Ortu'] || row['wa_ortu'] || row['Nomor_WA'] || row['nomor_wa'] || row['Telepon_Ortu'] || row['telepon_ortu'] || row['No_WA']).trim() : null,
-          parent_name: row['Nama_Ortu'] || row['nama_ortu'] || row['Wali'] || row['wali'] ? String(row['Nama_Ortu'] || row['nama_ortu'] || row['Wali'] || row['wali']).trim() : null
-        })).filter(g => g.name && g.identifier)
+        const payload: any[] = []
+        const sheetsProcessed: string[] = []
+
+        // Iterasi semua sheet di file Excel (misal: "X A", "X B", "X C", ...)
+        for (const sheetName of wb.SheetNames) {
+          const ws = wb.Sheets[sheetName]
+          if (!ws) continue
+
+          const rows: any[][] = XLSX.utils.sheet_to_json(ws, { header: 1, raw: false, defval: '' })
+          if (!rows || rows.length === 0) continue
+
+          // Deteksi kelas default dari nama sheet
+          let sheetClass = ''
+          const cleanSheet = sheetName.trim()
+          if (!cleanSheet.toLowerCase().startsWith('sheet') && cleanSheet.toLowerCase() !== 'template') {
+            sheetClass = cleanSheet
+          }
+
+          // Cari info kelas di baris-baris awal sebelum tabel utama (misal: "KELAS X A")
+          for (let r = 0; r < Math.min(rows.length, 10); r++) {
+            const rowStr = rows[r].map(c => String(c || '').trim()).join(' ')
+            const matchClass = rowStr.match(/KELAS\s*[:\s-]?\s*([A-Za-z0-9\s.-]+)/i)
+            if (matchClass && matchClass[1]) {
+              const detected = matchClass[1].trim()
+              if (detected.length <= 15 && !detected.toLowerCase().includes('fase')) {
+                sheetClass = detected
+              }
+            }
+          }
+
+          // Deteksi baris header tabel
+          let headerRowIndex = -1
+          let nameCol = -1
+          let nisCol = -1
+          let nisnCol = -1
+          let idCol = -1
+          let kelasCol = -1
+          let jkCol = -1
+          let sekolahAsalCol = -1
+          let nfcCol = -1
+          let parentPhoneCol = -1
+          let parentNameCol = -1
+
+          for (let r = 0; r < Math.min(rows.length, 20); r++) {
+            const row = rows[r]
+            const nextRow = r + 1 < rows.length ? rows[r + 1] : []
+            const nonEmpty = row.filter((c: any) => String(c || '').trim().length > 0)
+            if (nonEmpty.length < 2) continue
+
+            let tempNameCol = -1
+            let hasIdentifierLike = false
+
+            row.forEach((cellVal: any, colIdx: number) => {
+              const text1 = String(cellVal || '').toLowerCase().replace(/[\r\n]+/g, ' ').trim()
+              const text2 = String(nextRow[colIdx] || '').toLowerCase().replace(/[\r\n]+/g, ' ').trim()
+              const comb = `${text1} ${text2}`.trim()
+
+              const isName =
+                text1 === 'nama' ||
+                text1 === 'name' ||
+                text1.includes('nama siswa') ||
+                text1.includes('nama peserta didik') ||
+                text1.includes('nama lengkap') ||
+                text1.includes('student name') ||
+                (text1.includes('nama') && !text1.includes('sekolah') && !text1.includes('daftar') && !text1.includes('ortu') && !text1.includes('wali'))
+
+              if (isName) tempNameCol = colIdx
+
+              if (
+                text1.includes('nisn') || comb.includes('nisn') ||
+                text1 === 'nis' || comb.includes('nis') ||
+                text1 === 'id' || text1.includes('identifier') ||
+                text1 === 'no' || text1 === 'nomor' || text1.includes('nik') || text1.includes('nim')
+              ) {
+                hasIdentifierLike = true
+              }
+            })
+
+            if (tempNameCol !== -1 && hasIdentifierLike) {
+              headerRowIndex = r
+              break
+            }
+          }
+
+          if (headerRowIndex === -1) {
+            // Bukan sheet tabel siswa, lewati
+            continue
+          }
+
+          const headerRow = rows[headerRowIndex]
+          const subHeaderRow = headerRowIndex + 1 < rows.length ? rows[headerRowIndex + 1] : []
+
+          headerRow.forEach((cellVal: any, colIdx: number) => {
+            const t1 = String(cellVal || '').toLowerCase().replace(/[\r\n]+/g, ' ').trim()
+            const t2 = String(subHeaderRow[colIdx] || '').toLowerCase().replace(/[\r\n]+/g, ' ').trim()
+            const comb = `${t1} ${t2}`.trim()
+
+            if (comb.includes('nama ortu') || comb.includes('nama wali') || comb.includes('parent name')) {
+              parentNameCol = colIdx
+            } else if (
+              t1 === 'nama' || t1 === 'name' ||
+              comb.includes('nama siswa') || comb.includes('nama peserta didik') || comb.includes('nama lengkap') ||
+              comb.includes('student name') ||
+              (t1.includes('nama') && !comb.includes('sekolah') && !comb.includes('daftar') && !comb.includes('ortu') && !comb.includes('wali'))
+            ) {
+              if (nameCol === -1) nameCol = colIdx
+            } else if (comb.includes('nisn') || t1.includes('nisn') || comb === 'nomor nisn' || t1 === 'nomor nisn') {
+              nisnCol = colIdx
+            } else if (t1 === 'nis' || t2 === 'nis' || comb === 'nis' || comb === 'nomor nis' || (/\bnis\b/.test(t1) && !t1.includes('nisn'))) {
+              nisCol = colIdx
+            } else if (t1 === 'id' || comb.includes('identifier') || comb.includes('nim') || comb.includes('nik')) {
+              idCol = colIdx
+            } else if (comb.includes('kelas') || comb.includes('kls') || comb.includes('class') || t1.includes('ket kls') || comb.includes('ket kls')) {
+              kelasCol = colIdx
+            } else if (comb.includes('jk') || comb.includes('p/l') || comb.includes('l/p') || comb.includes('gender') || comb.includes('jenis kelamin')) {
+              jkCol = colIdx
+            } else if (comb.includes('sekolah asal') || comb.includes('asal sekolah')) {
+              sekolahAsalCol = colIdx
+            } else if (comb.includes('nfc') || comb.includes('uid')) {
+              nfcCol = colIdx
+            } else if (
+              comb.includes('no_wa_ortu') || comb.includes('wa ortu') || comb.includes('telepon') ||
+              comb.includes('telp') || comb.includes('no wa') || comb.includes('hp ortu') ||
+              comb.includes('wa') || comb.includes('phone')
+            ) {
+              if (parentPhoneCol === -1) parentPhoneCol = colIdx
+            }
+          })
+
+          let startDataRow = headerRowIndex + 1
+          if (subHeaderRow.length > 0) {
+            const subStr = subHeaderRow.map(c => String(c || '').trim().toLowerCase()).join(' ')
+            if (subStr.includes('nisn') || subStr.includes('nis') || subStr.includes('p/l') || subStr.includes('kls')) {
+              startDataRow = headerRowIndex + 2
+            }
+          }
+
+          let sheetStudentsCount = 0
+
+          for (let r = startDataRow; r < rows.length; r++) {
+            const dataRow = rows[r]
+            if (!dataRow || dataRow.length === 0) continue
+
+            const rawName = nameCol !== -1 ? String(dataRow[nameCol] || '').trim() : ''
+            if (!rawName) continue
+
+            const upper = rawName.toUpperCase()
+            if (
+              upper.startsWith('JUMLAH') ||
+              upper.startsWith('TOTAL') ||
+              upper.startsWith('MENGETAHUI') ||
+              upper.startsWith('KEPALA') ||
+              upper.startsWith('WALI KELAS') ||
+              upper.startsWith('GURU') ||
+              upper === 'L' || upper === 'P' || upper === 'L/P'
+            ) {
+              continue
+            }
+
+            let rawNis = nisCol !== -1 ? String(dataRow[nisCol] || '').trim() : ''
+            let rawNisn = nisnCol !== -1 ? String(dataRow[nisnCol] || '').trim() : ''
+            let rawId = idCol !== -1 ? String(dataRow[idCol] || '').trim() : ''
+
+            // Tambahkan angka 0 di depan jika format angka Excel menghilangkan leading zero NISN 10 digit
+            if (/^\d{9}$/.test(rawNisn)) {
+              rawNisn = '0' + rawNisn
+            }
+
+            // Fallback Identifier: NIS -> NISN -> ID Kolom -> Generated Fallback
+            const identifier = rawNis || rawNisn || rawId || (sheetClass ? `${sheetClass}-${r + 1}` : `SISWA-${r + 1}`)
+
+            // Fallback Kelas: Kolom KET KLS/KELAS -> Sheet Title -> Sheet Name
+            let kelas = kelasCol !== -1 ? String(dataRow[kelasCol] || '').trim() : ''
+            if (!kelas && sheetClass) {
+              kelas = sheetClass
+            }
+            if (!kelas && wb.SheetNames.length > 1 && !sheetName.toLowerCase().startsWith('sheet')) {
+              kelas = sheetName
+            }
+
+            const nfcUid = nfcCol !== -1 ? String(dataRow[nfcCol] || '').trim() : null
+            const parentPhone = parentPhoneCol !== -1 ? String(dataRow[parentPhoneCol] || '').trim() : null
+            const parentName = parentNameCol !== -1 ? String(dataRow[parentNameCol] || '').trim() : null
+            const gender = jkCol !== -1 ? String(dataRow[jkCol] || '').trim() : null
+            const sekolahAsal = sekolahAsalCol !== -1 ? String(dataRow[sekolahAsalCol] || '').trim() : null
+
+            payload.push({
+              name: rawName,
+              identifier,
+              kelas: kelas || null,
+              nfc_uid: nfcUid || null,
+              parent_phone: parentPhone || null,
+              parent_name: parentName || null,
+              gender: gender || null,
+              nisn: rawNisn || null,
+              sekolah_asal: sekolahAsal || null
+            })
+            sheetStudentsCount++
+          }
+
+          if (sheetStudentsCount > 0) {
+            sheetsProcessed.push(`${sheetName} (${sheetStudentsCount} siswa)`)
+          }
+        }
 
         if (payload.length === 0) {
-          toast.error("Format file tidak sesuai. Pastikan ada kolom 'Nama' dan 'ID'.")
+          toast.error("Format file tidak terbaca. Pastikan ada baris tabel dengan kolom 'Nama' dan 'NIS' / 'NISN' / 'ID'.")
           setUploading(false)
           return
         }
 
         const uploadRes = await api.post(`/org-attendance/${orgSlug}/guests`, { guests: payload })
-        toast.success(uploadRes.data.message)
+        toast.success(
+          sheetsProcessed.length > 1 
+            ? `Berhasil mengimpor ${payload.length} siswa dari ${sheetsProcessed.length} kelas!`
+            : uploadRes.data.message || `${payload.length} data siswa berhasil disimpan.`
+        )
         fetchGuests()
       } catch (err: any) {
-        toast.error(err.response?.data?.error || 'Gagal mengupload data')
+        console.error('Error uploading excel:', err)
+        toast.error(err.response?.data?.error || 'Gagal memproses data Excel')
       } finally {
         setUploading(false)
         if (fileInputRef.current) fileInputRef.current.value = ''
@@ -491,7 +688,7 @@ function GuestsContent() {
                 </span>
               </h3>
               <p className="text-sm text-slate-500 mt-0.5">
-                Format wajib: Kolom <b>Nama</b> dan <b>ID / NIS</b>. Opsional: <b>Kelas</b>, <b>NFC_UID</b>
+                Mendukung format standar KitaAtur maupun <b>Format Absen / Dapodik Sekolah</b> (multi-sheet kelas, NISN/NIS, jenis kelamin).
               </p>
             </div>
             <div className="flex items-center gap-3 w-full md:w-auto">
@@ -627,7 +824,12 @@ function GuestsContent() {
                     <div key={g.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
                       <div className="mb-4">
                         <div className="flex items-start justify-between gap-2">
-                          <h4 className="font-bold text-slate-900 text-base">{g.name}</h4>
+                          <div>
+                            <h4 className="font-bold text-slate-900 text-base">{g.name}</h4>
+                            {g.sekolah_asal && (
+                              <p className="text-[11px] text-slate-400 mt-0.5">Asal: {g.sekolah_asal}</p>
+                            )}
+                          </div>
                           {g.kelas && (
                             <span className="bg-blue-50 text-[#0087FF] border border-blue-100 font-bold text-xs px-2 py-0.5 rounded-md shrink-0">
                               {g.kelas}
@@ -638,6 +840,9 @@ function GuestsContent() {
                           <div className="flex items-center gap-2 text-xs text-slate-600">
                             <span className="font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded text-[10px] uppercase">ID/NIS</span>
                             <span className="font-mono">{g.identifier || '-'}</span>
+                            {g.nisn && g.nisn !== g.identifier && (
+                              <span className="text-[10px] text-slate-400 font-mono">(NISN: {g.nisn})</span>
+                            )}
                           </div>
                           
                           {/* NFC Status on Mobile */}
@@ -742,6 +947,9 @@ function GuestsContent() {
                         <tr key={g.id} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
                           <td className="px-4 py-3">
                             <div className="font-bold text-slate-900">{g.name}</div>
+                            {g.sekolah_asal && (
+                              <div className="text-[11px] text-slate-400 mt-0.5">Asal: {g.sekolah_asal}</div>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <div className="text-sm font-semibold text-slate-600">
@@ -756,6 +964,9 @@ function GuestsContent() {
                             <div className="text-xs font-mono text-slate-600 bg-slate-100 px-2 py-1 rounded-md inline-block">
                               {g.identifier || '-'}
                             </div>
+                            {g.nisn && g.nisn !== g.identifier && (
+                              <div className="text-[10px] text-slate-400 font-mono mt-0.5">NISN: {g.nisn}</div>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             {g.nfc_uid ? (

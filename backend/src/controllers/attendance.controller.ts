@@ -547,7 +547,10 @@ export const getGuests = async (req: Request, res: Response) => {
         kelas: (guest.custom_data && (guest.custom_data as any).kelas) ? (guest.custom_data as any).kelas : null,
         nfc_uid: (guest.custom_data && (guest.custom_data as any).nfc_uid) ? (guest.custom_data as any).nfc_uid : null,
         parent_phone: (guest.custom_data && (guest.custom_data as any).parent_phone) ? (guest.custom_data as any).parent_phone : null,
-        parent_name: (guest.custom_data && (guest.custom_data as any).parent_name) ? (guest.custom_data as any).parent_name : null
+        parent_name: (guest.custom_data && (guest.custom_data as any).parent_name) ? (guest.custom_data as any).parent_name : null,
+        gender: (guest.custom_data && (guest.custom_data as any).gender) ? (guest.custom_data as any).gender : null,
+        nisn: (guest.custom_data && (guest.custom_data as any).nisn) ? (guest.custom_data as any).nisn : null,
+        sekolah_asal: (guest.custom_data && (guest.custom_data as any).sekolah_asal) ? (guest.custom_data as any).sekolah_asal : null
       };
     });
 
@@ -577,19 +580,22 @@ export const uploadGuests = async (req: Request, res: Response) => {
       return res.status(400).json({ error: 'Tidak ada data tamu yang valid.' });
     }
 
-    // Deduplicate the incoming payload by name (keep the last occurrence)
+    // Deduplicate incoming payload by identifier (primary) or identifier + name
     const uniqueGuestsMap = new Map();
     validGuests.forEach(g => {
       const rawWa = (g as any).parent_phone || (g as any).no_wa_ortu || (g as any).wa_ortu || (g as any).parent_wa || (g as any).telepon_ortu || (g as any).wa;
       const cleanWa = rawWa ? normalizePhoneNumber(String(rawWa)) : null;
-      // Key by lowercase name to prevent same-name duplicates in the upload itself
-      uniqueGuestsMap.set(String(g.name).trim().toLowerCase(), { 
+      const dedupeKey = `${String(g.identifier).trim().toLowerCase()}_${String(g.name).trim().toLowerCase()}`;
+      uniqueGuestsMap.set(dedupeKey, { 
         name: String(g.name).trim(), 
         identifier: String(g.identifier).trim(),
         kelas: g.kelas ? String(g.kelas).trim() : null,
         nfc_uid: (g.nfc_uid || (g as any).nfc || (g as any).uid) ? String(g.nfc_uid || (g as any).nfc || (g as any).uid).trim() : null,
         parent_phone: cleanWa,
-        parent_name: ((g as any).parent_name || (g as any).nama_ortu) ? String((g as any).parent_name || (g as any).nama_ortu).trim() : null
+        parent_name: ((g as any).parent_name || (g as any).nama_ortu) ? String((g as any).parent_name || (g as any).nama_ortu).trim() : null,
+        gender: (g as any).gender || (g as any).jk || null,
+        nisn: (g as any).nisn || null,
+        sekolah_asal: (g as any).sekolah_asal || null
       });
     });
     const uniqueGuests = Array.from(uniqueGuestsMap.values());
@@ -599,11 +605,11 @@ export const uploadGuests = async (req: Request, res: Response) => {
       select: { identifier: true, name: true, id: true, custom_data: true }
     });
     
-    const existingByIdentifier = new Map(existingGuests.map(g => [g.identifier, g]));
+    const existingByIdentifier = new Map(existingGuests.map(g => [g.identifier.toLowerCase(), g]));
     const existingByName = new Map(existingGuests.map(g => [g.name.toLowerCase(), g]));
 
     const ops = uniqueGuests.map(g => {
-      const existingGuest = existingByIdentifier.get(g.identifier) || existingByName.get(g.name.toLowerCase());
+      const existingGuest = existingByIdentifier.get(g.identifier.toLowerCase()) || existingByName.get(g.name.toLowerCase());
       
       if (existingGuest) {
         const prevCustomData = (existingGuest.custom_data as any) || {};
@@ -612,7 +618,10 @@ export const uploadGuests = async (req: Request, res: Response) => {
           ...(g.kelas ? { kelas: g.kelas } : {}),
           ...(g.nfc_uid ? { nfc_uid: g.nfc_uid } : {}),
           ...(g.parent_phone ? { parent_phone: g.parent_phone } : {}),
-          ...(g.parent_name ? { parent_name: g.parent_name } : {})
+          ...(g.parent_name ? { parent_name: g.parent_name } : {}),
+          ...(g.gender ? { gender: g.gender } : {}),
+          ...(g.nisn ? { nisn: g.nisn } : {}),
+          ...(g.sekolah_asal ? { sekolah_asal: g.sekolah_asal } : {})
         };
         return prisma.org_guests.update({
           where: { id: existingGuest.id },
@@ -628,6 +637,9 @@ export const uploadGuests = async (req: Request, res: Response) => {
         if (g.nfc_uid) customData.nfc_uid = g.nfc_uid;
         if (g.parent_phone) customData.parent_phone = g.parent_phone;
         if (g.parent_name) customData.parent_name = g.parent_name;
+        if (g.gender) customData.gender = g.gender;
+        if (g.nisn) customData.nisn = g.nisn;
+        if (g.sekolah_asal) customData.sekolah_asal = g.sekolah_asal;
         return prisma.org_guests.create({
           data: {
             organization_id: org.id,
@@ -641,7 +653,7 @@ export const uploadGuests = async (req: Request, res: Response) => {
 
     const createdGuests = await prisma.$transaction(ops);
 
-    res.status(201).json({ message: `${createdGuests.length} tamu berhasil ditambahkan.`, data: createdGuests });
+    res.status(201).json({ message: `${createdGuests.length} data siswa/tamu berhasil disimpan.`, data: createdGuests });
   } catch (error) {
     console.error('Error uploading guests:', error);
     res.status(500).json({ error: 'Terjadi kesalahan saat menyimpan data tamu.' });
