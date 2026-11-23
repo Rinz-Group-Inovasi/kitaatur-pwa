@@ -153,11 +153,11 @@ export async function getStudentStats(req: Request, res: Response) {
     }
 
     const [violations, totalViolationPoints] = await Promise.all([
-      prisma.student_violations.findMany({
+      (prisma as any).student_violations.findMany({
         where: { guest_id: student.id },
         orderBy: { occurred_at: 'desc' }
       }),
-      prisma.student_violations.aggregate({
+      (prisma as any).student_violations.aggregate({
         where: { guest_id: student.id },
         _sum: { points: true }
       })
@@ -168,7 +168,7 @@ export async function getStudentStats(req: Request, res: Response) {
         name: student.name,
         identifier: student.identifier,
         totalViolationPoints: totalViolationPoints._sum.points || 0,
-        violations: violations.map(v => ({
+        violations: violations.map((v: any) => ({
           id: v.id,
           title: v.title,
           category: v.category,

@@ -2,6 +2,8 @@ import { Request, Response } from 'express';
 import { prisma } from '../config/db';
 import { sendViolationNotification } from '../services/whatsapp.service';
 
+const db = prisma as any;
+
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 async function resolveOrgId(orgIdOrSlug: string): Promise<string | null> {
@@ -43,7 +45,7 @@ export async function getViolations(req: Request, res: Response) {
     }
 
     const [violations, total] = await Promise.all([
-      prisma.student_violations.findMany({
+      db.student_violations.findMany({
         where,
         include: {
           guest: {
@@ -66,7 +68,7 @@ export async function getViolations(req: Request, res: Response) {
         skip,
         take
       }),
-      prisma.student_violations.count({ where })
+      db.student_violations.count({ where })
     ]);
 
     return res.json({
@@ -92,17 +94,17 @@ export async function getViolationsSummary(req: Request, res: Response) {
     if (!orgId) return res.status(404).json({ error: 'Organisasi tidak ditemukan' });
 
     const [totalRecords, pointsAgg, byCategory, topStudents] = await Promise.all([
-      prisma.student_violations.count({ where: { organization_id: orgId } }),
-      prisma.student_violations.aggregate({
+      db.student_violations.count({ where: { organization_id: orgId } }),
+      db.student_violations.aggregate({
         where: { organization_id: orgId },
         _sum: { points: true }
       }),
-      prisma.student_violations.groupBy({
+      db.student_violations.groupBy({
         by: ['category'],
         where: { organization_id: orgId },
         _count: { id: true }
       }),
-      prisma.student_violations.groupBy({
+      db.student_violations.groupBy({
         by: ['guest_id'],
         where: { organization_id: orgId },
         _sum: { points: true },
@@ -117,7 +119,7 @@ export async function getViolationsSummary(req: Request, res: Response) {
     ]);
 
     // Ambil info nama siswa untuk top students
-    const guestIds = topStudents.map((t) => t.guest_id);
+    const guestIds = topStudents.map((t: any) => t.guest_id);
     const guests = await prisma.org_guests.findMany({
       where: { id: { in: guestIds } },
       select: { id: true, name: true, identifier: true, custom_data: true }
@@ -125,7 +127,7 @@ export async function getViolationsSummary(req: Request, res: Response) {
 
     const guestMap = new Map(guests.map((g) => [g.id, g]));
 
-    const enrichedTopStudents = topStudents.map((item) => {
+    const enrichedTopStudents = topStudents.map((item: any) => {
       const g = guestMap.get(item.guest_id);
       return {
         guestId: item.guest_id,
@@ -143,7 +145,7 @@ export async function getViolationsSummary(req: Request, res: Response) {
       sedang: 0,
       berat: 0
     };
-    byCategory.forEach((c) => {
+    byCategory.forEach((c: any) => {
       categoryCounts[c.category.toLowerCase()] = c._count.id;
     });
 
@@ -182,7 +184,7 @@ export async function createViolation(req: any, res: Response) {
 
     const reporterId = req.user?.id || null;
 
-    const violation = await prisma.student_violations.create({
+    const violation = await db.student_violations.create({
       data: {
         organization_id: orgId,
         guest_id: guestId,
@@ -249,7 +251,7 @@ export async function updateViolation(req: Request, res: Response) {
     const orgId = await resolveOrgId(orgIdOrSlug);
     if (!orgId) return res.status(404).json({ error: 'Organisasi tidak ditemukan' });
 
-    const existing = await prisma.student_violations.findFirst({
+    const existing = await db.student_violations.findFirst({
       where: { id, organization_id: orgId }
     });
 
@@ -265,7 +267,7 @@ export async function updateViolation(req: Request, res: Response) {
     if (notes !== undefined) data.notes = notes;
     if (status !== undefined) data.status = String(status).toLowerCase();
 
-    const updated = await prisma.student_violations.update({
+    const updated = await db.student_violations.update({
       where: { id },
       data,
       include: {
@@ -298,7 +300,7 @@ export async function deleteViolation(req: Request, res: Response) {
     const orgId = await resolveOrgId(orgIdOrSlug);
     if (!orgId) return res.status(404).json({ error: 'Organisasi tidak ditemukan' });
 
-    await prisma.student_violations.deleteMany({
+    await db.student_violations.deleteMany({
       where: { id, organization_id: orgId }
     });
 
@@ -325,11 +327,11 @@ export async function getStudentViolations(req: Request, res: Response) {
     }
 
     const [violations, pointsAgg] = await Promise.all([
-      prisma.student_violations.findMany({
+      db.student_violations.findMany({
         where: { guest_id: guestId },
         orderBy: { occurred_at: 'desc' }
       }),
-      prisma.student_violations.aggregate({
+      db.student_violations.aggregate({
         where: { guest_id: guestId },
         _sum: { points: true }
       })
@@ -350,3 +352,4 @@ export async function getStudentViolations(req: Request, res: Response) {
     return res.status(500).json({ error: 'Gagal mengambil riwayat pelanggaran siswa', details: err.message });
   }
 }
+

@@ -12,6 +12,8 @@ import fs from 'fs';
 import crypto from 'crypto';
 import { prisma } from '../config/db';
 
+const db = prisma as any;
+
 const activeSockets = new Map<string, WASocket>();
 const qrDataUrls = new Map<string, string>();
 const reconnectTimeouts = new Map<string, NodeJS.Timeout>();
@@ -86,7 +88,7 @@ function getSessionDir(organizationId: string): string {
 }
 
 export async function getSessionStatus(organizationId: string) {
-  const dbSession = await prisma.school_whatsapp_sessions.findUnique({
+  const dbSession = await db.school_whatsapp_sessions.findUnique({
     where: { organization_id: organizationId }
   });
 
@@ -140,7 +142,7 @@ export async function startWhatsAppSession(organizationId: string) {
       try {
         const qrUrl = await QRCode.toDataURL(qr);
         qrDataUrls.set(organizationId, qrUrl);
-        await prisma.school_whatsapp_sessions.upsert({
+        await db.school_whatsapp_sessions.upsert({
           where: { organization_id: organizationId },
           create: {
             organization_id: organizationId,
@@ -162,7 +164,7 @@ export async function startWhatsAppSession(organizationId: string) {
       const rawNumber = jid.split(':')[0] || jid.split('@')[0];
       qrDataUrls.delete(organizationId);
 
-      await prisma.school_whatsapp_sessions.upsert({
+      await db.school_whatsapp_sessions.upsert({
         where: { organization_id: organizationId },
         create: {
           organization_id: organizationId,
@@ -194,7 +196,7 @@ export async function startWhatsAppSession(organizationId: string) {
           fs.rmSync(sessionDir, { recursive: true, force: true });
         } catch (e) {}
 
-        await prisma.school_whatsapp_sessions.upsert({
+        await db.school_whatsapp_sessions.upsert({
           where: { organization_id: organizationId },
           create: {
             organization_id: organizationId,
@@ -210,7 +212,7 @@ export async function startWhatsAppSession(organizationId: string) {
         });
         console.log(`[WhatsApp] School ${organizationId} logged out`);
       } else if (shouldReconnect) {
-        await prisma.school_whatsapp_sessions.upsert({
+        await db.school_whatsapp_sessions.upsert({
           where: { organization_id: organizationId },
           create: { organization_id: organizationId, status: 'connecting' },
           update: { status: 'connecting' }
@@ -329,13 +331,13 @@ export async function startWhatsAppSession(organizationId: string) {
             });
 
             // Cek pelanggaran siswa
-            const violations = await prisma.student_violations.findMany({
+            const violations = await db.student_violations.findMany({
               where: { guest_id: student.id },
               orderBy: { occurred_at: 'desc' },
               take: 5
             });
 
-            const totalPoints = await prisma.student_violations.aggregate({
+            const totalPoints = await db.student_violations.aggregate({
               where: { guest_id: student.id },
               _sum: { points: true }
             });
@@ -344,19 +346,20 @@ export async function startWhatsAppSession(organizationId: string) {
 
             let attStatusText = 'Belum Ada Catatan Kehadiran';
             if (attendanceToday) {
-              const jamMasuk = new Date(attendanceToday.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-              const jamPulang = attendanceToday.check_out_time 
-                ? new Date(attendanceToday.check_out_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+              const att = attendanceToday as any;
+              const jamMasuk = new Date(att.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+              const jamPulang = att.check_out_time 
+                ? new Date(att.check_out_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
                 : '-';
               attStatusText = `Hadir (Masuk: ${jamMasuk} WIB | Pulang: ${jamPulang})`;
-              if (attendanceToday.status === 'late') {
+              if (att.status === 'late') {
                 attStatusText = `Terlambat (Masuk: ${jamMasuk} WIB | Pulang: ${jamPulang})`;
               }
             }
 
             let violationListText = 'Tidak ada catatan pelanggaran aktif. Pertahankan!';
-            if (violations.length > 0) {
-              violationListText = violations.map((v, i) => {
+            if (violations && violations.length > 0) {
+              violationListText = violations.map((v: any, i: number) => {
                 const dateStr = new Date(v.occurred_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
                 return `${i + 1}. [${dateStr}] *${v.title}* (+${v.points} poin) - ${v.category.toUpperCase()}`;
               }).join('\n');
@@ -407,7 +410,7 @@ export async function disconnectWhatsAppSession(organizationId: string) {
     fs.rmSync(sessionDir, { recursive: true, force: true });
   } catch (e) {}
 
-  await prisma.school_whatsapp_sessions.upsert({
+  await db.school_whatsapp_sessions.upsert({
     where: { organization_id: organizationId },
     create: {
       organization_id: organizationId,
@@ -635,7 +638,7 @@ export async function sendViolationNotification(
     const sock = activeSockets.get(organizationId);
     if (!sock) return false;
 
-    const totalPoints = await prisma.student_violations.aggregate({
+    const totalPoints = await db.student_violations.aggregate({
       where: { guest_id: student.id },
       _sum: { points: true }
     });
@@ -659,7 +662,7 @@ export async function sendViolationNotification(
 // Inisialisasi sesi WA yang aktif saat backend baru dinyalakan
 export async function initActiveWhatsAppSessions() {
   try {
-    const sessions = await prisma.school_whatsapp_sessions.findMany({
+    const sessions = await db.school_whatsapp_sessions.findMany({
       where: {
         status: { in: ['connected', 'qr_ready', 'connecting'] }
       }

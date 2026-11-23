@@ -132,3 +132,4 @@ export async function pairParentManual(req: Request, res: Response) {
     return res.status(500).json({ error: 'Gagal menautkan nomor WhatsApp', details: err.message });
   }
 }
+
