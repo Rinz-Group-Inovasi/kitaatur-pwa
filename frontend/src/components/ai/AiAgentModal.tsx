@@ -189,13 +189,7 @@ export default function AiAgentModal({
     {
       id: 'welcome',
       role: 'assistant',
-      content: `Halo! Saya **KitaAtur AI Copilot**. 
-Saya siap membantu Anda:
-- 📊 **Setup Laporan**: Laporan Keuangan, Presensi, atau Laporan Kegiatan Bulanan.
-- 📅 **Bikin Agenda**: Rundown Acara, Timeline Rapat Kerja, dan langsung membuatkan Sesi Presensi ke sistem.
-- 💡 **Asisten Cerdas**: Tanya jawab kas, analisis kedisiplinan tim, draf pengumuman WhatsApp/Email, dan konsultasi operasional.
-
-Silakan pilih ide prompt di bawah atau ketik langsung kebutuhan Anda!`,
+      content: `Halo! Saya **KitaAtur Copilot**. Ada yang bisa saya bantu terkait laporan kas, agenda kegiatan, atau administrasi hari ini?`,
       timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
     }
   ])
@@ -540,10 +534,7 @@ Silakan pilih ide prompt di bawah atau ketik langsung kebutuhan Anda!`,
       {
         id: 'welcome-reset',
         role: 'assistant',
-        content: `Percakapan baru telah dimulai. Apa yang bisa saya bantu hari ini? 
-- Ingin setup draf laporan?
-- Ingin bikin rundown agenda acara/rapat?
-- Ingin tanya jawab seputar kas & data tim?`,
+        content: `Percakapan baru telah dimulai. Apa yang bisa saya bantu hari ini?`,
         timestamp: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
       }
     ])
@@ -561,115 +552,51 @@ Silakan pilih ide prompt di bawah atau ketik langsung kebutuhan Anda!`,
       <div className="relative w-full h-full sm:h-[90vh] sm:max-w-3xl flex flex-col bg-white sm:rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
         
         {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-slate-900 via-sky-950 to-slate-900 text-white border-b border-sky-900/40 shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-cyan-400 p-0.5 shadow-md shadow-sky-500/20">
-              <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-sky-400 animate-pulse" />
-              </div>
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0087FF] border border-blue-100 flex items-center justify-center font-bold shadow-xs">
+              <Sparkles className="w-5 h-5 text-[#0087FF]" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h3 className="font-bold text-sm sm:text-base text-white">KitaAtur AI Copilot</h3>
-                <span className="px-2 py-0.5 text-[10px] font-semibold bg-sky-500/20 text-sky-300 border border-sky-400/30 rounded-full">
-                  Agent v2.5
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-300 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping" />
-                {mode === 'org' && orgSlug ? (
-                  <span className="flex items-center gap-1">
-                    <Building className="w-3 h-3 text-sky-300" /> Mode Organisasi ({orgSlug})
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1">
-                    <UserCheck className="w-3 h-3 text-sky-300" /> Mode Personal Space
-                  </span>
-                )}
+              <h3 className="font-extrabold text-slate-900 text-base leading-tight">KitaAtur Copilot</h3>
+              <p className="text-xs text-slate-500 flex items-center gap-1.5 mt-0.5 font-medium">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                {mode === 'org' && orgSlug ? `Mode Organisasi (${orgSlug})` : 'Mode Pribadi'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1 sm:gap-2">
+          <div className="flex items-center gap-1">
             <button
               onClick={handleResetChat}
               title="Reset Percakapan"
-              className="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition"
             >
               <RotateCcw className="w-4 h-4" />
             </button>
             <button
               onClick={onClose}
-              title="Tutup AI Copilot"
-              className="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+              title="Tutup"
+              className="p-2 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-xl transition"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Category Mode Pills */}
-        <div className="flex items-center gap-2 px-4 py-2 bg-slate-50 border-b border-slate-100 overflow-x-auto no-scrollbar shrink-0">
-          <span className="text-[11px] font-medium text-slate-400 whitespace-nowrap">Filter Aksi:</span>
-          {(['all', 'Laporan', 'Agenda', 'Asisten'] as const).map(cat => (
-            <button
-              key={cat}
-              onClick={() => setCategoryFilter(cat)}
-              className={`px-3 py-1 rounded-full text-xs font-medium transition-all whitespace-nowrap ${
-                categoryFilter === cat
-                  ? 'bg-sky-600 text-white shadow-sm'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-100'
-              }`}
-            >
-              {cat === 'all' ? '✨ Semua Aksi' : cat === 'Laporan' ? '📊 Setup Laporan' : cat === 'Agenda' ? '📅 Bikin Agenda' : '🤖 Asisten User'}
-            </button>
-          ))}
-          {mode === 'org' && orgSlug && (
-            <button
-              onClick={handleTriggerDigest}
-              disabled={loadingDigest}
-              className="ml-auto px-2.5 py-1 text-xs font-semibold bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-full flex items-center gap-1 shadow-xs transition shrink-0 disabled:opacity-50"
-            >
-              <Zap className="w-3 h-3 animate-pulse" />
-              {loadingDigest ? 'Menjalankan...' : 'Jalankan AI Digest'}
-            </button>
-          )}
-        </div>
-
-        {/* AGENTIC WATCHDOG & EARLY WARNING STATUS BAR */}
-        {mode === 'org' && earlyWarnings && (
-          <div className="px-4 py-2 bg-gradient-to-r from-slate-900 to-sky-950 text-white border-b border-sky-800/50 flex flex-wrap items-center justify-between gap-2 shrink-0 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="flex items-center gap-1 px-2 py-0.5 rounded-full font-bold text-[10px] bg-sky-500/20 text-sky-300 border border-sky-400/30">
-                <Radio className="w-3 h-3 text-emerald-400 animate-ping" />
-                AI Watchdog: Skor {earlyWarnings.healthScore}/100 ({earlyWarnings.healthStatus})
-              </span>
-              {earlyWarnings.warnings && earlyWarnings.warnings.length > 0 ? (
-                <span className="text-[11px] text-amber-300 flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
-                  {earlyWarnings.warnings.length} anomali butuh perhatian pengurus
-                </span>
-              ) : (
-                <span className="text-[11px] text-emerald-300 flex items-center gap-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  Kondisi organisasi stabil & sehat
-                </span>
-              )}
+        {/* Notifikasi Anomali (Hanya tampil jika ada anomali butuh perhatian) */}
+        {mode === 'org' && earlyWarnings?.warnings && earlyWarnings.warnings.length > 0 && (
+          <div className="px-4 py-2 bg-amber-50/80 border-b border-amber-200/60 flex items-center justify-between gap-3 text-xs text-amber-900 shrink-0">
+            <div className="flex items-center gap-2 truncate">
+              <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+              <span className="font-semibold truncate">{earlyWarnings.warnings[0].title}</span>
             </div>
-
-            {earlyWarnings.warnings && earlyWarnings.warnings.length > 0 && (
-              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
-                {earlyWarnings.warnings.slice(0, 2).map((w: any) => (
-                  <button
-                    key={w.id}
-                    onClick={() => handleSendMessage(w.actionPrompt)}
-                    className="px-2 py-0.5 text-[10px] bg-white/10 hover:bg-white/20 text-slate-200 border border-white/10 rounded-md transition whitespace-nowrap"
-                  >
-                    Atasi {w.title.slice(0, 20)}...
-                  </button>
-                ))}
-              </div>
-            )}
+            <button
+              onClick={() => handleSendMessage(earlyWarnings.warnings[0].actionPrompt)}
+              className="px-2.5 py-1 text-xs font-semibold bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 rounded-lg transition shrink-0 shadow-xs"
+            >
+              Atasi Sekarang
+            </button>
           </div>
         )}
 
@@ -688,10 +615,10 @@ Silakan pilih ide prompt di bawah atau ketik langsung kebutuhan Anda!`,
 
               <div className={`max-w-[85%] sm:max-w-[78%] flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div
-                  className={`rounded-2xl px-4 py-3 shadow-sm ${
+                  className={`rounded-2xl px-4 py-3 shadow-xs ${
                     msg.role === 'user'
-                      ? 'bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-br-none'
-                      : 'bg-white text-slate-800 border border-slate-200/80 rounded-bl-none'
+                      ? 'bg-[#0087FF] text-white rounded-br-sm'
+                      : 'bg-white text-slate-800 border border-slate-200/90 rounded-bl-sm'
                   }`}
                 >
                   {msg.role === 'user' ? (
@@ -1026,30 +953,28 @@ Silakan pilih ide prompt di bawah atau ketik langsung kebutuhan Anda!`,
 
         {/* Quick Suggestion Chips */}
         {filteredPrompts.length > 0 && (
-          <div className="px-4 py-2 bg-slate-50/80 border-t border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
-            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider shrink-0">Saran Cepat:</span>
-            {filteredPrompts.map(p => (
+          <div className="px-4 py-2.5 bg-slate-50 border-t border-slate-100 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0">
+            {filteredPrompts.slice(0, 5).map(p => (
               <button
                 key={p.id}
                 onClick={() => handleSendMessage(p.prompt)}
                 disabled={loading}
-                className="px-2.5 py-1 text-xs font-medium bg-white text-slate-700 hover:text-sky-600 hover:border-sky-300 border border-slate-200 rounded-full shadow-xs transition shrink-0 flex items-center gap-1 disabled:opacity-50"
+                className="px-3 py-1.5 text-xs font-semibold bg-white text-slate-700 hover:text-[#0087FF] hover:border-blue-200 border border-slate-200 rounded-xl shadow-xs transition shrink-0 disabled:opacity-50"
               >
-                <span>{p.label}</span>
-                <ChevronRight className="w-3 h-3 text-slate-400" />
+                {p.label}
               </button>
             ))}
           </div>
         )}
 
         {/* Input Bar */}
-        <div className="p-3 sm:p-4 bg-white border-t border-slate-200 shrink-0">
+        <div className="p-3 sm:p-4 bg-white border-t border-slate-100 shrink-0">
           <form
             onSubmit={(e) => {
               e.preventDefault()
               handleSendMessage()
             }}
-            className="flex items-end gap-2"
+            className="flex items-end gap-2 bg-slate-50 border border-slate-200 rounded-2xl p-1.5 focus-within:border-[#0087FF] focus-within:ring-2 focus-within:ring-blue-100 focus-within:bg-white transition"
           >
             {/* Hidden File Input for Receipt OCR */}
             <input
@@ -1064,15 +989,15 @@ Silakan pilih ide prompt di bawah atau ketik langsung kebutuhan Anda!`,
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingReceipt || loading}
-              title="Pindai Struk Kas dengan AI OCR"
-              className="h-[42px] px-3 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50 shrink-0"
+              title="Pindai Struk Kas"
+              className="h-10 px-3 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200/80 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50 shrink-0 shadow-xs"
             >
               {uploadingReceipt ? (
-                <Loader2 className="w-4 h-4 animate-spin text-sky-600" />
+                <Loader2 className="w-4 h-4 animate-spin text-[#0087FF]" />
               ) : (
                 <>
                   <Camera className="w-4 h-4 text-slate-600" />
-                  <span className="hidden sm:inline">Scan Struk</span>
+                  <span className="hidden sm:inline font-semibold">Scan Struk</span>
                 </>
               )}
             </button>
@@ -1088,22 +1013,21 @@ Silakan pilih ide prompt di bawah atau ketik langsung kebutuhan Anda!`,
                 }
               }}
               rows={1}
-              placeholder="Tanyakan sesuatu, minta setup laporan, atau bikin agenda..."
-              className="flex-1 max-h-32 min-h-[42px] px-3.5 py-2.5 text-xs sm:text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-sky-500 focus:bg-white resize-none transition"
+              placeholder="Tanyakan sesuatu, draf laporan, atau bikin agenda..."
+              className="flex-1 max-h-32 min-h-[40px] px-2 py-2 text-xs sm:text-sm text-slate-900 bg-transparent border-0 focus:outline-hidden resize-none transition"
             />
 
             <button
               type="submit"
               disabled={!input.trim() || loading || uploadingReceipt}
-              className="h-[42px] px-4 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white font-medium text-xs sm:text-sm rounded-xl shadow-md shadow-sky-500/20 flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+              className="h-10 px-4 bg-[#0087FF] hover:bg-blue-600 text-white font-bold text-xs sm:text-sm rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-30 disabled:pointer-events-none shrink-0 shadow-xs"
             >
               <Send className="w-4 h-4" />
               <span className="hidden sm:inline">Kirim</span>
             </button>
           </form>
-          <div className="flex items-center justify-between mt-2 px-1 text-[10px] text-slate-400">
-            <span>Tekan <strong>Enter</strong> untuk mengirim, <strong>Shift+Enter</strong> untuk baris baru</span>
-            <span>Didukung Google Gemini 2.5</span>
+          <div className="flex items-center justify-between mt-2 px-1 text-[11px] text-slate-400">
+            <span>Tekan <b>Enter</b> untuk kirim, <b>Shift+Enter</b> baris baru</span>
           </div>
         </div>
 

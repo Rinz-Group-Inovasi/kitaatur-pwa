@@ -17,6 +17,7 @@ const db = prisma as any;
 const activeSockets = new Map<string, WASocket>();
 const qrDataUrls = new Map<string, string>();
 const reconnectTimeouts = new Map<string, NodeJS.Timeout>();
+const startingSessionPromises = new Map<string, Promise<any>>();
 
 // ==========================================
 // ANTI-BAN & SPAM-PREVENTION ENGINE
@@ -105,130 +106,158 @@ export async function getSessionStatus(organizationId: string) {
 }
 
 export async function startWhatsAppSession(organizationId: string) {
-  const existingSocket = activeSockets.get(organizationId);
-  if (existingSocket) {
-    const currentStatus = await getSessionStatus(organizationId);
-    if (currentStatus.isConnected) {
-      return currentStatus;
-    }
+  const existingPromise = startingSessionPromises.get(organizationId);
+  if (existingPromise) {
+    return existingPromise;
   }
 
-  const sessionDir = getSessionDir(organizationId);
-  const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-  const { version } = await fetchLatestBaileysVersion();
-
-  const logger = pino({ level: 'silent' });
-
-  const sock = makeWASocket({
-    version,
-    logger,
-    printQRInTerminal: false,
-    auth: {
-      creds: state.creds,
-      keys: makeCacheableSignalKeyStore(state.keys, logger)
-    },
-    generateHighQualityLinkPreview: false,
-    syncFullHistory: false
-  });
-
-  activeSockets.set(organizationId, sock);
-
-  sock.ev.on('creds.update', saveCreds);
-
-  sock.ev.on('connection.update', async (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
+  const promise = (async () => {
+    const existingSocket = activeSockets.get(organizationId);
+    if (existingSocket) {
+      const currentStatus = await getSessionStatus(organizationId);
+      if (currentStatus.isConnected) {
+        return currentStatus;
+      }
+      // Tutup dan bersihkan socket lama jika sedang hang/reconnect sebelum membuat socket baru
       try {
-        const qrUrl = await QRCode.toDataURL(qr);
-        qrDataUrls.set(organizationId, qrUrl);
-        await db.school_whatsapp_sessions.upsert({
-          where: { organization_id: organizationId },
-          create: {
-            organization_id: organizationId,
-            status: 'qr_ready',
-            qr_code: qrUrl
-          },
-          update: {
-            status: 'qr_ready',
-            qr_code: qrUrl
-          }
-        });
-      } catch (err) {
-        console.error('Error generating QR code data URL:', err);
-      }
-    }
-
-    if (connection === 'open') {
-      const jid = sock.user?.id || '';
-      const rawNumber = jid.split(':')[0] || jid.split('@')[0];
-      qrDataUrls.delete(organizationId);
-
-      await db.school_whatsapp_sessions.upsert({
-        where: { organization_id: organizationId },
-        create: {
-          organization_id: organizationId,
-          status: 'connected',
-          phone_number: rawNumber,
-          qr_code: null,
-          last_active_at: new Date()
-        },
-        update: {
-          status: 'connected',
-          phone_number: rawNumber,
-          qr_code: null,
-          last_active_at: new Date()
-        }
-      });
-      console.log(`[WhatsApp] School ${organizationId} connected successfully with ${rawNumber}`);
-    }
-
-    if (connection === 'close') {
-      const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
-      const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
-
-      qrDataUrls.delete(organizationId);
+        existingSocket.ev.removeAllListeners('connection.update');
+        existingSocket.ev.removeAllListeners('creds.update');
+        existingSocket.ev.removeAllListeners('messages.upsert');
+        existingSocket.end(undefined);
+      } catch (e) {}
       activeSockets.delete(organizationId);
+    }
 
-      if (statusCode === DisconnectReason.loggedOut) {
-        // Hapus folder credential jika logout
+    const sessionDir = getSessionDir(organizationId);
+    const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
+
+    // KUNCI PENTING: Jika session sudah memiliki info user (me), pastikan registered = true agar Baileys tidak memancarkan QR ulang!
+    if (state.creds.me && !state.creds.registered) {
+      state.creds.registered = true;
+      await saveCreds();
+    }
+
+    const { version } = await fetchLatestBaileysVersion();
+    const logger = pino({ level: 'silent' });
+
+    const sock = makeWASocket({
+      version,
+      logger,
+      printQRInTerminal: false,
+      auth: {
+        creds: state.creds,
+        keys: makeCacheableSignalKeyStore(state.keys, logger)
+      },
+      generateHighQualityLinkPreview: false,
+      syncFullHistory: false
+    });
+
+    activeSockets.set(organizationId, sock);
+
+    sock.ev.on('creds.update', saveCreds);
+
+    sock.ev.on('connection.update', async (update) => {
+      const { connection, lastDisconnect, qr } = update;
+
+      if (qr) {
+        // JANGAN menimpa status jadi qr_ready jika sesi sebenarnya sudah terautentikasi di storage
+        if (state.creds.me && state.creds.registered) {
+          console.log(`[WhatsApp] Ignoring spurious QR code for already registered school ${organizationId}`);
+          return;
+        }
+
         try {
-          fs.rmSync(sessionDir, { recursive: true, force: true });
-        } catch (e) {}
+          const qrUrl = await QRCode.toDataURL(qr);
+          qrDataUrls.set(organizationId, qrUrl);
+          await db.school_whatsapp_sessions.upsert({
+            where: { organization_id: organizationId },
+            create: {
+              organization_id: organizationId,
+              status: 'qr_ready',
+              qr_code: qrUrl
+            },
+            update: {
+              status: 'qr_ready',
+              qr_code: qrUrl
+            }
+          });
+        } catch (err) {
+          console.error('Error generating QR code data URL:', err);
+        }
+      }
+
+      if (connection === 'open') {
+        state.creds.registered = true;
+        await saveCreds();
+
+        const jid = sock.user?.id || '';
+        const rawNumber = jid.split(':')[0] || jid.split('@')[0];
+        qrDataUrls.delete(organizationId);
 
         await db.school_whatsapp_sessions.upsert({
           where: { organization_id: organizationId },
           create: {
             organization_id: organizationId,
-            status: 'disconnected',
-            phone_number: null,
-            qr_code: null
+            status: 'connected',
+            phone_number: rawNumber,
+            qr_code: null,
+            last_active_at: new Date()
           },
           update: {
-            status: 'disconnected',
-            phone_number: null,
-            qr_code: null
+            status: 'connected',
+            phone_number: rawNumber,
+            qr_code: null,
+            last_active_at: new Date()
           }
         });
-        console.log(`[WhatsApp] School ${organizationId} logged out`);
-      } else if (shouldReconnect) {
-        await db.school_whatsapp_sessions.upsert({
-          where: { organization_id: organizationId },
-          create: { organization_id: organizationId, status: 'connecting' },
-          update: { status: 'connecting' }
-        });
-        
-        // Reconnect after 5 seconds
-        if (!reconnectTimeouts.has(organizationId)) {
-          const timeout = setTimeout(() => {
-            reconnectTimeouts.delete(organizationId);
-            startWhatsAppSession(organizationId).catch(console.error);
-          }, 5000);
-          reconnectTimeouts.set(organizationId, timeout);
+        console.log(`[WhatsApp] School ${organizationId} connected successfully with ${rawNumber}`);
+      }
+
+      if (connection === 'close') {
+        const statusCode = (lastDisconnect?.error as any)?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+
+        qrDataUrls.delete(organizationId);
+        activeSockets.delete(organizationId);
+
+        if (statusCode === DisconnectReason.loggedOut) {
+          // Hapus folder credential jika logout dari WhatsApp HP
+          try {
+            fs.rmSync(sessionDir, { recursive: true, force: true });
+          } catch (e) {}
+
+          await db.school_whatsapp_sessions.upsert({
+            where: { organization_id: organizationId },
+            create: {
+              organization_id: organizationId,
+              status: 'disconnected',
+              phone_number: null,
+              qr_code: null
+            },
+            update: {
+              status: 'disconnected',
+              phone_number: null,
+              qr_code: null
+            }
+          });
+          console.log(`[WhatsApp] School ${organizationId} logged out`);
+        } else if (shouldReconnect) {
+          await db.school_whatsapp_sessions.updateMany({
+            where: { organization_id: organizationId },
+            data: { status: 'connecting', qr_code: null }
+          });
+          
+          // Reconnect after 3 seconds
+          if (!reconnectTimeouts.has(organizationId)) {
+            const timeout = setTimeout(() => {
+              reconnectTimeouts.delete(organizationId);
+              startWhatsAppSession(organizationId).catch(console.error);
+            }, 3000);
+            reconnectTimeouts.set(organizationId, timeout);
+          }
         }
       }
-    }
-  });
+    });
 
   // Listener pesan masuk dari orang tua
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
@@ -382,7 +411,13 @@ export async function startWhatsAppSession(organizationId: string) {
     }
   });
 
-  return getSessionStatus(organizationId);
+  return await getSessionStatus(organizationId);
+  })().finally(() => {
+    startingSessionPromises.delete(organizationId);
+  });
+
+  startingSessionPromises.set(organizationId, promise);
+  return promise;
 }
 
 export async function disconnectWhatsAppSession(organizationId: string) {
@@ -490,7 +525,22 @@ async function processOrgQueue(organizationId: string) {
 
 // Pengiriman Pesan Mandiri (dengan Outbound Queue & Throttle)
 export async function sendWhatsAppMessage(organizationId: string, toPhone: string, text: string): Promise<boolean> {
-  const sock = activeSockets.get(organizationId);
+  let sock = activeSockets.get(organizationId);
+  if (!sock) {
+    try {
+      const dbSession = await db.school_whatsapp_sessions.findUnique({
+        where: { organization_id: organizationId }
+      });
+      if (dbSession && (dbSession.status === 'connected' || dbSession.phone_number)) {
+        await startWhatsAppSession(organizationId);
+        for (let i = 0; i < 8; i++) {
+          await new Promise((r) => setTimeout(r, 500));
+          sock = activeSockets.get(organizationId);
+          if (sock) break;
+        }
+      }
+    } catch (e) {}
+  }
   if (!sock) return false;
 
   if (!outboundQueues.has(organizationId)) {

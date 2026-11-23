@@ -85,7 +85,11 @@ export default function SchoolWhatsAppConnector({ orgSlug, isLeader }: SchoolWha
         setStatus(res.data.status || 'qr_ready')
         setQrCode(res.data.qrCode || null)
         setPhoneNumber(res.data.phoneNumber || null)
-        toast.success('Sesi WhatsApp dimulai. Silakan scan QR code.')
+        if (res.data.status === 'connected') {
+          toast.success('Bot WhatsApp sudah terhubung!')
+        } else {
+          toast.success('Sesi WhatsApp dimulai. Silakan scan QR code.')
+        }
       }
     } catch (err: any) {
       toast.error(err.response?.data?.error || 'Gagal memulai koneksi WhatsApp')
