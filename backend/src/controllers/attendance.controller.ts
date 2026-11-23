@@ -660,6 +660,122 @@ export const uploadGuests = async (req: Request, res: Response) => {
   }
 };
 
+// Hapus satu data tamu / siswa
+export const deleteGuest = async (req: Request, res: Response) => {
+  const { orgIdOrSlug, guestId } = req.params;
+
+  try {
+    const org = await prisma.organizations.findFirst({
+      where: { OR: [{ id: orgIdOrSlug.length === 36 ? orgIdOrSlug : undefined }, { slug: orgIdOrSlug }] }
+    });
+    if (!org) return res.status(404).json({ error: 'Organisasi tidak ditemukan' });
+
+    const guest = await prisma.org_guests.findFirst({
+      where: { id: guestId, organization_id: org.id }
+    });
+    if (!guest) return res.status(404).json({ error: 'Data siswa/tamu tidak ditemukan' });
+
+    await prisma.org_guests.delete({
+      where: { id: guest.id }
+    });
+
+    return res.json({ success: true, message: `Data siswa ${guest.name} berhasil dihapus.` });
+  } catch (error) {
+    console.error('Error deleting guest:', error);
+    return res.status(500).json({ error: 'Gagal menghapus data siswa.' });
+  }
+};
+
+// Hapus massal data tamu / siswa (semua, berdasarkan kelas, filter kartu, atau pilihan ID)
+export const bulkDeleteGuests = async (req: Request, res: Response) => {
+  const { orgIdOrSlug } = req.params;
+  const { guestIds, deleteAll, kelas, onlyUnlinkedNfc } = req.body;
+
+  try {
+    const org = await prisma.organizations.findFirst({
+      where: { OR: [{ id: orgIdOrSlug.length === 36 ? orgIdOrSlug : undefined }, { slug: orgIdOrSlug }] }
+    });
+    if (!org) return res.status(404).json({ error: 'Organisasi tidak ditemukan' });
+
+    // Skenario 1: Hapus SEMUA data siswa di organisasi ini
+    if (deleteAll === true) {
+      const result = await prisma.org_guests.deleteMany({
+        where: { organization_id: org.id }
+      });
+      return res.json({
+        success: true,
+        count: result.count,
+        message: `Berhasil menghapus seluruh ${result.count} data siswa.`
+      });
+    }
+
+    // Skenario 2: Hapus berdasarkan kelas tertentu
+    if (kelas && typeof kelas === 'string') {
+      const allGuests = await prisma.org_guests.findMany({
+        where: { organization_id: org.id },
+        select: { id: true, custom_data: true }
+      });
+      const matchingIds = allGuests
+        .filter(g => (g.custom_data as any)?.kelas?.toLowerCase() === kelas.toLowerCase())
+        .map(g => g.id);
+
+      if (matchingIds.length === 0) {
+        return res.json({ success: true, count: 0, message: `Tidak ditemukan siswa di kelas ${kelas}.` });
+      }
+
+      const result = await prisma.org_guests.deleteMany({
+        where: { id: { in: matchingIds }, organization_id: org.id }
+      });
+      return res.json({
+        success: true,
+        count: result.count,
+        message: `Berhasil menghapus ${result.count} data siswa di kelas ${kelas}.`
+      });
+    }
+
+    // Skenario 3: Hapus siswa yang BELUM memiliki kartu NFC
+    if (onlyUnlinkedNfc === true) {
+      const allGuests = await prisma.org_guests.findMany({
+        where: { organization_id: org.id },
+        select: { id: true, custom_data: true }
+      });
+      const unlinkedIds = allGuests
+        .filter(g => !(g.custom_data as any)?.nfc_uid)
+        .map(g => g.id);
+
+      if (unlinkedIds.length === 0) {
+        return res.json({ success: true, count: 0, message: 'Semua siswa sudah memiliki kartu NFC.' });
+      }
+
+      const result = await prisma.org_guests.deleteMany({
+        where: { id: { in: unlinkedIds }, organization_id: org.id }
+      });
+      return res.json({
+        success: true,
+        count: result.count,
+        message: `Berhasil menghapus ${result.count} data siswa yang belum memiliki kartu NFC.`
+      });
+    }
+
+    // Skenario 4: Hapus daftar ID siswa yang dipilih
+    if (Array.isArray(guestIds) && guestIds.length > 0) {
+      const result = await prisma.org_guests.deleteMany({
+        where: { id: { in: guestIds }, organization_id: org.id }
+      });
+      return res.json({
+        success: true,
+        count: result.count,
+        message: `Berhasil menghapus ${result.count} data siswa yang dipilih.`
+      });
+    }
+
+    return res.status(400).json({ error: 'Parameter penghapusan tidak valid.' });
+  } catch (error) {
+    console.error('Error bulk deleting guests:', error);
+    return res.status(500).json({ error: 'Gagal melakukan penghapusan massal data siswa.' });
+  }
+};
+
 export const scanGuestQR = async (req: Request, res: Response) => {
   const { orgIdOrSlug, sessionId } = req.params;
   const { qrToken } = req.body;

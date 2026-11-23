@@ -86,10 +86,12 @@ router.post('/:orgIdOrSlug/scan', requireOrgRole(['head', 'bendahara', 'sekretar
 // ========================
 // Guest Attendance (QR Code)
 // ========================
-import { getGuests, uploadGuests, scanGuestQR, getGuestStats, getGuestAnalytics } from '../controllers/attendance.controller'
+import { getGuests, uploadGuests, deleteGuest, bulkDeleteGuests, scanGuestQR, getGuestStats, getGuestAnalytics } from '../controllers/attendance.controller'
 
 router.get('/:orgIdOrSlug/guests', requireOrgRole(['head', 'sekretaris', 'member']), getGuests)
 router.post('/:orgIdOrSlug/guests', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, uploadGuests)
+router.delete('/:orgIdOrSlug/guests/:guestId', requireOrgRole(['head', 'sekretaris']), deleteGuest)
+router.post('/:orgIdOrSlug/guests/bulk-delete', requireOrgRole(['head', 'sekretaris']), bulkDeleteGuests)
 router.get('/:orgIdOrSlug/guests/analytics', requireOrgRole(['head', 'sekretaris', 'member']), getGuestAnalytics)
 router.post('/:orgIdOrSlug/sessions/:sessionId/guests/scan', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, scanGuestQR)
 router.post('/:orgIdOrSlug/sessions/:sessionId/members/scan', requireOrgRole(['head', 'sekretaris']), requireActiveOrgSubscription, scanGuestQR)

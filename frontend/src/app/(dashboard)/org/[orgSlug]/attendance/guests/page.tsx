@@ -61,6 +61,14 @@ function GuestsContent() {
   const [waNameInput, setWaNameInput] = useState('')
   const [isSavingWa, setIsSavingWa] = useState(false)
 
+  // Bulk Delete & Multi-select State
+  const [selectedGuestIds, setSelectedGuestIds] = useState<string[]>([])
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteTab, setDeleteTab] = useState<'all' | 'class' | 'unlinked'>('all')
+  const [confirmText, setConfirmText] = useState('')
+  const [targetClass, setTargetClass] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
+
   const openPairWaModal = (student: any) => {
     setWaStudent(student)
     setWaPhoneInput(student.parent_phone || '')
@@ -85,6 +93,89 @@ function GuestsContent() {
       toast.error(err.response?.data?.error || 'Gagal menautkan nomor WhatsApp')
     } finally {
       setIsSavingWa(false)
+    }
+  }
+
+  // Multi-select & Deletion Handlers
+  const toggleSelectGuest = (id: string) => {
+    setSelectedGuestIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
+  const toggleSelectAllVisible = () => {
+    const visibleIds = filteredGuests.map(g => g.id)
+    const allSelected = visibleIds.length > 0 && visibleIds.every(id => selectedGuestIds.includes(id))
+    if (allSelected) {
+      setSelectedGuestIds(prev => prev.filter(id => !visibleIds.includes(id)))
+    } else {
+      setSelectedGuestIds(prev => Array.from(new Set([...prev, ...visibleIds])))
+    }
+  }
+
+  const handleDeleteSingle = async (guest: any) => {
+    if (!window.confirm(`Hapus data ${guest.name}? Data presensi dan pelanggaran terkait juga akan dihapus.`)) return
+    setIsDeleting(true)
+    try {
+      const res = await api.delete(`/org-attendance/${orgSlug}/guests/${guest.id}`)
+      toast.success(res.data.message || 'Data berhasil dihapus')
+      setGuests(prev => prev.filter(g => g.id !== guest.id))
+      setSelectedGuestIds(prev => prev.filter(id => id !== guest.id))
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Gagal menghapus data')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleDeleteSelected = async () => {
+    if (selectedGuestIds.length === 0) return
+    if (!window.confirm(`Hapus ${selectedGuestIds.length} data siswa terpilih secara permanen?`)) return
+    setIsDeleting(true)
+    try {
+      const res = await api.post(`/org-attendance/${orgSlug}/guests/bulk-delete`, {
+        guestIds: selectedGuestIds
+      })
+      toast.success(res.data.message || `Berhasil menghapus ${selectedGuestIds.length} data`)
+      setGuests(prev => prev.filter(g => !selectedGuestIds.includes(g.id)))
+      setSelectedGuestIds([])
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Gagal menghapus data')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
+  const handleExecuteDeleteModal = async () => {
+    if (deleteTab === 'all') {
+      if (confirmText.trim().toUpperCase() !== 'HAPUS') {
+        toast.error('Ketik "HAPUS" untuk konfirmasi reset total.')
+        return
+      }
+    } else if (deleteTab === 'class') {
+      if (!targetClass) {
+        toast.error('Pilih kelas yang ingin dihapus.')
+        return
+      }
+    }
+
+    setIsDeleting(true)
+    try {
+      const payload: any = {}
+      if (deleteTab === 'all') payload.deleteAll = true
+      if (deleteTab === 'class') payload.kelas = targetClass
+      if (deleteTab === 'unlinked') payload.onlyUnlinkedNfc = true
+
+      const res = await api.post(`/org-attendance/${orgSlug}/guests/bulk-delete`, payload)
+      toast.success(res.data.message || 'Penghapusan data berhasil!')
+      setShowDeleteModal(false)
+      setConfirmText('')
+      setSelectedGuestIds([])
+      fetchGuests()
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Gagal menghapus data')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -619,6 +710,10 @@ function GuestsContent() {
   const totalNfcCount = guests.filter(g => !!g.nfc_uid).length
   const currentStudentIndex = selectedStudent ? guests.findIndex(g => g.id === selectedStudent.id) : -1
 
+  const availableClasses = Array.from(
+    new Set(guests.map(g => g.kelas).filter((k): k is string => Boolean(k)))
+  ).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 pb-20">
       {/* Top Header */}
@@ -731,15 +826,36 @@ function GuestsContent() {
               </p>
             </div>
             
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Cari nama, NIS, kelas, NFC UID..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm w-full md:w-72 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-              />
+            <div className="flex items-center gap-2 w-full md:w-auto">
+              <div className="relative flex-1 md:flex-initial">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Cari nama, NIS, kelas, NFC UID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-4 py-2 border border-slate-200 rounded-lg text-sm w-full md:w-72 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                />
+              </div>
+
+              {guests.length > 0 && (
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(true)
+                    setDeleteTab('all')
+                    setConfirmText('')
+                    if (availableClasses.length > 0 && !targetClass) {
+                      setTargetClass(availableClasses[0])
+                    }
+                  }}
+                  className="px-3.5 py-2 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors shrink-0 active:scale-95 shadow-xs"
+                  title="Opsi hapus massal: reset semua, per kelas, atau siswa tanpa kartu"
+                >
+                  <Trash2 className="w-4 h-4 text-rose-500" />
+                  <span className="hidden sm:inline">Kelola & Hapus Data...</span>
+                  <span className="sm:hidden">Hapus</span>
+                </button>
+              )}
             </div>
           </div>
           
@@ -800,6 +916,32 @@ function GuestsContent() {
             </button>
           </div>
 
+          {/* Multi-select Action Bar */}
+          {selectedGuestIds.length > 0 && (
+            <div className="bg-rose-50 border-b border-rose-200 px-4 py-2.5 flex items-center justify-between animate-in fade-in">
+              <div className="flex items-center gap-2 text-xs font-bold text-rose-800">
+                <span className="w-2 h-2 rounded-full bg-rose-500 animate-ping"></span>
+                <span>{selectedGuestIds.length} data siswa dipilih</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setSelectedGuestIds([])}
+                  className="text-xs font-bold text-slate-500 hover:text-slate-800 px-2.5 py-1 rounded-lg transition"
+                >
+                  Batal
+                </button>
+                <button
+                  onClick={handleDeleteSelected}
+                  disabled={isDeleting}
+                  className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-sm disabled:opacity-50"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Hapus ({selectedGuestIds.length})</span>
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* List Body */}
           <div className="p-4 bg-slate-50/50">
             {loading ? (
@@ -821,20 +963,43 @@ function GuestsContent() {
                 {/* Mobile View: Cards */}
                 <div className="grid grid-cols-1 gap-4 md:hidden">
                   {filteredGuests.map((g) => (
-                    <div key={g.id} className="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+                    <div 
+                      key={g.id} 
+                      className={`p-5 rounded-xl border shadow-sm flex flex-col justify-between transition-colors ${
+                        selectedGuestIds.includes(g.id) ? 'bg-rose-50/40 border-rose-300' : 'bg-white border-slate-200'
+                      }`}
+                    >
                       <div className="mb-4">
                         <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h4 className="font-bold text-slate-900 text-base">{g.name}</h4>
-                            {g.sekolah_asal && (
-                              <p className="text-[11px] text-slate-400 mt-0.5">Asal: {g.sekolah_asal}</p>
-                            )}
+                          <div className="flex items-start gap-2.5">
+                            <input
+                              type="checkbox"
+                              checked={selectedGuestIds.includes(g.id)}
+                              onChange={() => toggleSelectGuest(g.id)}
+                              className="w-4 h-4 mt-1 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                            />
+                            <div>
+                              <h4 className="font-bold text-slate-900 text-base">{g.name}</h4>
+                              {g.sekolah_asal && (
+                                <p className="text-[11px] text-slate-400 mt-0.5">Asal: {g.sekolah_asal}</p>
+                              )}
+                            </div>
                           </div>
-                          {g.kelas && (
-                            <span className="bg-blue-50 text-[#0087FF] border border-blue-100 font-bold text-xs px-2 py-0.5 rounded-md shrink-0">
-                              {g.kelas}
-                            </span>
-                          )}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            {g.kelas && (
+                              <span className="bg-blue-50 text-[#0087FF] border border-blue-100 font-bold text-xs px-2 py-0.5 rounded-md">
+                                {g.kelas}
+                              </span>
+                            )}
+                            <button
+                              onClick={() => handleDeleteSingle(g)}
+                              disabled={isDeleting}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                              title="Hapus siswa ini"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                         <div className="flex flex-col gap-1.5 mt-3">
                           <div className="flex items-center gap-2 text-xs text-slate-600">
@@ -931,20 +1096,43 @@ function GuestsContent() {
 
                 {/* Desktop View: Table */}
                 <div className="hidden md:block overflow-x-auto">
-                  <table className="w-full text-left border-collapse min-w-[700px]">
+                  <table className="w-full text-left border-collapse min-w-[750px]">
                     <thead>
                       <tr className="border-b border-slate-200 bg-slate-100/60">
+                        <th className="w-10 px-3 py-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={filteredGuests.length > 0 && filteredGuests.every(g => selectedGuestIds.includes(g.id))}
+                            onChange={toggleSelectAllVisible}
+                            className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                            title="Pilih semua siswa di tampilan ini"
+                          />
+                        </th>
                         <th className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-600">Nama Siswa</th>
                         <th className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-600">Kelas</th>
                         <th className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-600">ID / NIS</th>
                         <th className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-600">Kartu NFC Fisik</th>
                         <th className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-600">WhatsApp Ortu</th>
                         <th className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-600 text-right">Status Kehadiran</th>
+                        <th className="w-12 px-3 py-3 text-center text-xs font-extrabold uppercase tracking-wider text-slate-600">Aksi</th>
                       </tr>
                     </thead>
                     <tbody>
                       {filteredGuests.map((g) => (
-                        <tr key={g.id} className="border-b border-slate-100 hover:bg-slate-50/80 transition-colors">
+                        <tr 
+                          key={g.id} 
+                          className={`border-b border-slate-100 transition-colors ${
+                            selectedGuestIds.includes(g.id) ? 'bg-rose-50/50' : 'hover:bg-slate-50/80'
+                          }`}
+                        >
+                          <td className="w-10 px-3 py-3 text-center">
+                            <input
+                              type="checkbox"
+                              checked={selectedGuestIds.includes(g.id)}
+                              onChange={() => toggleSelectGuest(g.id)}
+                              className="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500 cursor-pointer"
+                            />
+                          </td>
                           <td className="px-4 py-3">
                             <div className="font-bold text-slate-900">{g.name}</div>
                             {g.sekolah_asal && (
@@ -1040,6 +1228,16 @@ function GuestsContent() {
                                 Belum Hadir
                               </div>
                             )}
+                          </td>
+                          <td className="px-3 py-3 text-center">
+                            <button
+                              onClick={() => handleDeleteSingle(g)}
+                              disabled={isDeleting}
+                              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors active:scale-95 disabled:opacity-50"
+                              title="Hapus data siswa ini"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
                           </td>
                         </tr>
                       ))}
@@ -1348,6 +1546,207 @@ function GuestsContent() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Kelola & Hapus Massal Data Siswa */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-lg bg-white rounded-3xl p-6 shadow-2xl border border-slate-100 space-y-5">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-slate-900 text-base">Kelola & Hapus Data Siswa</h3>
+                  <p className="text-xs text-slate-500">Pilih opsi pembersihan data yang efisien</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="text-slate-400 hover:text-slate-600 w-8 h-8 rounded-full flex items-center justify-center hover:bg-slate-100 transition"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Opsi Tab */}
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-100 rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setDeleteTab('all')}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all text-center ${
+                  deleteTab === 'all'
+                    ? 'bg-white text-rose-600 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Reset Semua
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteTab('class')}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all text-center ${
+                  deleteTab === 'class'
+                    ? 'bg-white text-rose-600 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Per Kelas
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteTab('unlinked')}
+                className={`py-2 px-3 rounded-xl text-xs font-bold transition-all text-center ${
+                  deleteTab === 'unlinked'
+                    ? 'bg-white text-rose-600 shadow-sm'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                Tanpa Kartu
+              </button>
+            </div>
+
+            {/* Tab 1: Reset Semua */}
+            {deleteTab === 'all' && (
+              <div className="space-y-4">
+                <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 space-y-1">
+                  <p className="font-bold flex items-center gap-1.5">
+                    <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                    Peringatan Tindakan Permanen
+                  </p>
+                  <p className="text-rose-700 leading-relaxed">
+                    Tindakan ini akan menghapus <b>seluruh {guests.length} data siswa</b> di sekolah ini, beserta riwayat presensi kartu gerbang dan catatan pelanggaran terkait.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Ketik <span className="font-mono text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200">HAPUS</span> untuk mengonfirmasi:
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ketik HAPUS"
+                    value={confirmText}
+                    onChange={(e) => setConfirmText(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-900 outline-none focus:border-rose-500 uppercase transition tracking-wider"
+                    autoFocus
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Per Kelas */}
+            {deleteTab === 'class' && (
+              <div className="space-y-4">
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-900 space-y-1">
+                  <p className="font-bold">Hapus Seluruh Siswa di Kelas Tertentu</p>
+                  <p className="text-amber-800 leading-relaxed">
+                    Data siswa di kelas lain tidak akan terpengaruh. Pilih kelas yang ingin dibersihkan.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1.5">
+                    Pilih Kelas ({availableClasses.length} kelas terdeteksi):
+                  </label>
+                  {availableClasses.length === 0 ? (
+                    <p className="text-xs text-slate-400 italic">Tidak ada data kelas yang terdaftar.</p>
+                  ) : (
+                    <select
+                      value={targetClass}
+                      onChange={(e) => setTargetClass(e.target.value)}
+                      className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 outline-none focus:border-rose-500 transition"
+                    >
+                      {availableClasses.map(cls => {
+                        const count = guests.filter(g => g.kelas === cls).length
+                        return (
+                          <option key={cls} value={cls}>
+                            Kelas {cls} ({count} siswa)
+                          </option>
+                        )
+                      })}
+                    </select>
+                  )}
+                </div>
+
+                {targetClass && (
+                  <p className="text-xs text-slate-500">
+                    Siswa di kelas <b>{targetClass}</b>:{' '}
+                    <span className="font-bold text-rose-600">
+                      {guests.filter(g => g.kelas === targetClass).length} orang
+                    </span>
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Tab 3: Tanpa Kartu */}
+            {deleteTab === 'unlinked' && (
+              <div className="space-y-4">
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl text-xs text-slate-700 space-y-1">
+                  <p className="font-bold text-slate-900">Bersihkan Siswa Tanpa Kartu NFC</p>
+                  <p className="text-slate-600 leading-relaxed">
+                    Siswa yang sudah memiliki kartu NFC fisik (<b>{totalNfcCount} orang</b>) akan tetap dipertahankan dengan aman.
+                  </p>
+                </div>
+
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-semibold text-amber-800 block">Total Siswa Belum Ada NFC</span>
+                    <span className="text-xl font-extrabold text-amber-900 font-mono">
+                      {guests.length - totalNfcCount} siswa
+                    </span>
+                  </div>
+                  <span className="text-xs font-bold bg-amber-200/70 text-amber-900 px-2.5 py-1 rounded-lg">
+                    Akan Dihapus
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setShowDeleteModal(false)}
+                className="px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                onClick={handleExecuteDeleteModal}
+                disabled={
+                  isDeleting ||
+                  (deleteTab === 'all' && confirmText.trim().toUpperCase() !== 'HAPUS') ||
+                  (deleteTab === 'class' && !targetClass) ||
+                  (deleteTab === 'unlinked' && (guests.length - totalNfcCount) === 0)
+                }
+                className="px-5 py-2.5 text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 active:scale-95 rounded-xl transition shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {isDeleting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Menghapus...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>
+                      {deleteTab === 'all'
+                        ? 'Konfirmasi Reset Total'
+                        : deleteTab === 'class'
+                        ? `Hapus Kelas ${targetClass}`
+                        : 'Hapus Siswa Tanpa NFC'}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}
