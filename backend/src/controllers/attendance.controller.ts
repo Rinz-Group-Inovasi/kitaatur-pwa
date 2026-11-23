@@ -2304,20 +2304,20 @@ export async function processNfcTap(req: any, res: Response) {
       });
 
       if (isCheckOutWindow && existing) {
-        if (existing.check_out_time) {
+        if ((existing as any).check_out_time) {
           return res.status(200).json({
             success: true,
             alreadyRecorded: true,
             isCheckOut: true,
             student: studentInfo,
             status: existing.status,
-            checkInTime: existing.check_out_time,
+            checkInTime: (existing as any).check_out_time,
             message: `${studentInfo.name} sudah absen pulang sebelumnya.`
           });
         }
         await prisma.guest_attendance.update({
           where: { id: existing.id },
-          data: { check_out_time: now }
+          data: { check_out_time: now } as any
         });
 
         sendAttendanceNotification(
@@ -2409,20 +2409,20 @@ export async function processNfcTap(req: any, res: Response) {
       });
 
       if (isCheckOutWindow && existing) {
-        if (existing.check_out_time) {
+        if ((existing as any).check_out_time) {
           return res.status(200).json({
             success: true,
             alreadyRecorded: true,
             isCheckOut: true,
             student: studentInfo,
             status: existing.status,
-            checkInTime: existing.check_out_time,
+            checkInTime: (existing as any).check_out_time,
             message: `${studentInfo.name} sudah absen pulang sebelumnya.`
           });
         }
         await prisma.attendance.update({
           where: { id: existing.id },
-          data: { check_out_time: now }
+          data: { check_out_time: now } as any
         });
         return res.status(200).json({
           success: true,
