@@ -2320,19 +2320,22 @@ export async function processNfcTap(req: any, res: Response) {
           data: { check_out_time: now } as any
         });
 
-        sendAttendanceNotification(
-          org.id,
-          {
-            id: matchedGuest.id,
-            name: matchedGuest.name,
-            identifier: matchedGuest.identifier,
-            parentPhone: (matchedGuest.custom_data as any)?.parent_phone,
-            kelas: (matchedGuest.custom_data as any)?.kelas
-          },
-          'pulang',
-          'Selesai Kegiatan Belajar',
-          now
-        ).catch(e => console.error('[WA tap notify error]', e));
+        const guestParentPhone = (matchedGuest.custom_data as any)?.parent_phone || (matchedGuest.custom_data as any)?.no_wa_ortu;
+        if (guestParentPhone) {
+          sendAttendanceNotification(
+            org.id,
+            {
+              id: matchedGuest.id,
+              name: matchedGuest.name,
+              identifier: matchedGuest.identifier,
+              parentPhone: guestParentPhone,
+              kelas: (matchedGuest.custom_data as any)?.kelas
+            },
+            'pulang',
+            'Selesai Kegiatan Belajar',
+            now
+          ).catch(e => console.error('[WA tap notify error]', e));
+        }
 
         return res.status(200).json({
           success: true,
@@ -2340,7 +2343,10 @@ export async function processNfcTap(req: any, res: Response) {
           student: studentInfo,
           status: existing.status,
           checkInTime: now,
-          message: `Absen Pulang Berhasil: ${studentInfo.name}`
+          message: `Absen Pulang Berhasil: ${studentInfo.name}`,
+          waNotification: guestParentPhone
+            ? { sent: true, recipient: guestParentPhone }
+            : { sent: false, reason: 'Nomor WA orang tua belum ditautkan' }
         });
       }
 
@@ -2378,19 +2384,22 @@ export async function processNfcTap(req: any, res: Response) {
         }
       });
 
-      sendAttendanceNotification(
-        org.id,
-        {
-          id: matchedGuest.id,
-          name: matchedGuest.name,
-          identifier: matchedGuest.identifier,
-          parentPhone: (matchedGuest.custom_data as any)?.parent_phone,
-          kelas: (matchedGuest.custom_data as any)?.kelas
-        },
-        'masuk',
-        status === 'late' ? 'Terlambat' : 'Tepat Waktu',
-        now
-      ).catch(e => console.error('[WA tap notify error]', e));
+      const guestParentPhone = (matchedGuest.custom_data as any)?.parent_phone || (matchedGuest.custom_data as any)?.no_wa_ortu;
+      if (guestParentPhone) {
+        sendAttendanceNotification(
+          org.id,
+          {
+            id: matchedGuest.id,
+            name: matchedGuest.name,
+            identifier: matchedGuest.identifier,
+            parentPhone: guestParentPhone,
+            kelas: (matchedGuest.custom_data as any)?.kelas
+          },
+          'masuk',
+          status === 'late' ? 'Terlambat' : 'Tepat Waktu',
+          now
+        ).catch(e => console.error('[WA tap notify error]', e));
+      }
 
       return res.status(200).json({
         success: true,
@@ -2398,7 +2407,10 @@ export async function processNfcTap(req: any, res: Response) {
         status,
         checkInTime: now,
         isCheckOut: false,
-        message: `Presensi Berhasil: ${studentInfo.name} (${status === 'late' ? 'Terlambat' : 'Hadir Tepat Waktu'})`
+        message: `Presensi Berhasil: ${studentInfo.name} (${status === 'late' ? 'Terlambat' : 'Hadir Tepat Waktu'})`,
+        waNotification: guestParentPhone
+          ? { sent: true, recipient: guestParentPhone }
+          : { sent: false, reason: 'Nomor WA orang tua belum ditautkan' }
       });
     }
 

@@ -93,15 +93,35 @@ export async function getSessionStatus(organizationId: string) {
     where: { organization_id: organizationId }
   });
 
+  const sessionDir = getSessionDir(organizationId);
+  const credsFile = path.join(sessionDir, 'creds.json');
+  let hasValidCreds = false;
+  let savedPhone = dbSession?.phone_number || null;
+  if (fs.existsSync(credsFile)) {
+    try {
+      const parsed = JSON.parse(fs.readFileSync(credsFile, 'utf-8'));
+      if (parsed?.me?.id) {
+        hasValidCreds = true;
+        if (!savedPhone) {
+          savedPhone = parsed.me.id.split(':')[0].split('@')[0];
+        }
+      }
+    } catch (e) {}
+  }
+
   const liveSocket = activeSockets.get(organizationId);
   const liveQr = qrDataUrls.get(organizationId);
 
+  // Jika creds valid ada di storage disk, bot dianggap connected
+  const isConnected = !!(hasValidCreds && (dbSession?.status === 'connected' || liveSocket));
+  const effectiveStatus = isConnected ? 'connected' : (dbSession?.status || 'disconnected');
+
   return {
-    status: dbSession?.status || 'disconnected',
-    phoneNumber: dbSession?.phone_number || null,
-    qrCode: liveQr || dbSession?.qr_code || null,
+    status: effectiveStatus,
+    phoneNumber: savedPhone,
+    qrCode: effectiveStatus === 'connected' ? null : (liveQr || dbSession?.qr_code || null),
     lastActiveAt: dbSession?.last_active_at || null,
-    isConnected: !!(liveSocket && dbSession?.status === 'connected')
+    isConnected
   };
 }
 
@@ -132,9 +152,16 @@ export async function startWhatsAppSession(organizationId: string) {
     const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
 
     // KUNCI PENTING: Jika session sudah memiliki info user (me), pastikan registered = true agar Baileys tidak memancarkan QR ulang!
-    if (state.creds.me && !state.creds.registered) {
-      state.creds.registered = true;
-      await saveCreds();
+    if (state.creds.me) {
+      if (!state.creds.registered) {
+        state.creds.registered = true;
+        await saveCreds();
+      }
+      // Pulihkan status DB jika tersangkut di qr_ready
+      await db.school_whatsapp_sessions.updateMany({
+        where: { organization_id: organizationId, status: 'qr_ready' },
+        data: { status: 'connecting', qr_code: null }
+      });
     }
 
     const { version } = await fetchLatestBaileysVersion();
@@ -161,7 +188,7 @@ export async function startWhatsAppSession(organizationId: string) {
 
       if (qr) {
         // JANGAN menimpa status jadi qr_ready jika sesi sebenarnya sudah terautentikasi di storage
-        if (state.creds.me && state.creds.registered) {
+        if (state.creds.me) {
           console.log(`[WhatsApp] Ignoring spurious QR code for already registered school ${organizationId}`);
           return;
         }
@@ -587,22 +614,18 @@ export async function sendAttendanceNotification(
     }
 
     if (!parentPhone) {
+      console.log(`[WhatsApp Notification] Student ${student.name} (${student.identifier}) has no parent_phone linked. Skipping WA notification.`);
       return false;
     }
 
-    const sock = activeSockets.get(organizationId);
-    if (!sock) {
-      return false;
-    }
-
-    // 1. Anti-Spam Deduplication: cegah duplikasi notifikasi identik untuk siswa yang sama dalam kurun waktu 5 menit
+    // 1. Anti-Spam Deduplication: cegah duplikasi notifikasi identik untuk siswa yang sama dalam kurun waktu 60 detik
     const todayStr = time.toISOString().split('T')[0];
     const dedupKey = `${organizationId}:${student.id}:${type}:${todayStr}`;
     const nowMs = Date.now();
     const lastSent = dedupCache.get(dedupKey);
 
-    if (lastSent && nowMs - lastSent < 5 * 60 * 1000) {
-      console.log(`[WhatsApp Anti-Ban] Dropped duplicate ${type} notification for student ${student.name}`);
+    if (lastSent && nowMs - lastSent < 60 * 1000) {
+      console.log(`[WhatsApp Anti-Ban] Dropped rapid duplicate ${type} notification for student ${student.name}`);
       return true;
     }
     dedupCache.set(dedupKey, nowMs);
@@ -683,10 +706,10 @@ export async function sendViolationNotification(
       parentPhone = cd.parent_phone || null;
     }
 
-    if (!parentPhone) return false;
-
-    const sock = activeSockets.get(organizationId);
-    if (!sock) return false;
+    if (!parentPhone) {
+      console.log(`[WhatsApp Violation] Student ${student.name} (${student.identifier}) has no parent_phone linked. Skipping WA notification.`);
+      return false;
+    }
 
     const totalPoints = await db.student_violations.aggregate({
       where: { guest_id: student.id },

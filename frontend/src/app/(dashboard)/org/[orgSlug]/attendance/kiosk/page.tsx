@@ -38,6 +38,11 @@ interface TapResult {
   isCheckOut?: boolean
   alreadyRecorded?: boolean
   message: string
+  waNotification?: {
+    sent: boolean
+    recipient?: string
+    reason?: string
+  }
 }
 
 interface RecentTap {
@@ -159,7 +164,8 @@ export default function NfcKioskPage() {
         checkInTime: data.checkInTime,
         isCheckOut: data.isCheckOut,
         alreadyRecorded: data.alreadyRecorded,
-        message: data.message
+        message: data.message,
+        waNotification: data.waNotification
       })
 
       // Update Ticker Live Feed (tambahkan siswa ke antrian terbaru)
@@ -490,6 +496,23 @@ export default function NfcKioskPage() {
                   {lastResult.status === 'late' ? <Clock className="w-4 h-4" /> : <CheckCircle2 className="w-4 h-4" />}
                   <span>{lastResult.message}</span>
                 </div>
+
+                {/* WA Ortu Delivery Feedback */}
+                {lastResult.waNotification && (
+                  <div className="mt-3 flex items-center justify-center">
+                    {lastResult.waNotification.sent ? (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                        <span>WA Notifikasi Orang Tua: Terkirim (+{lastResult.waNotification.recipient})</span>
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                        <AlertCircle className="w-3.5 h-3.5 text-amber-600" />
+                        <span>WA Ortu: {lastResult.waNotification.reason || 'Nomor Belum Ditautkan'}</span>
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           )}
