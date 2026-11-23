@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { api } from '@/lib/api'
 import toast from 'react-hot-toast'
+import { Sparkle } from '@phosphor-icons/react'
 import { 
   Sparkles, 
   Send, 
@@ -555,7 +556,7 @@ export default function AiAgentModal({
         <div className="flex items-center justify-between px-5 py-4 bg-white border-b border-slate-100 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0087FF] border border-blue-100 flex items-center justify-center font-bold shadow-xs">
-              <Sparkles className="w-5 h-5 text-[#0087FF]" />
+              <Sparkle className="w-5 h-5 text-[#0087FF]" weight="fill" />
             </div>
             <div>
               <h3 className="font-extrabold text-slate-900 text-base leading-tight">KitaAtur Copilot</h3>
