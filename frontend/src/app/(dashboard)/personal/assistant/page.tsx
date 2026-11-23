@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { api } from '@/lib/api'
 import toast from 'react-hot-toast'
+import { Sparkle } from '@phosphor-icons/react'
 import { 
   Sparkles, 
   Send, 
@@ -259,19 +260,14 @@ Apa yang bisa saya bantu hari ini?`,
             <span className="text-slate-800 font-medium">Personal AI Copilot</span>
           </div>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-cyan-400 p-0.5 shadow-md shadow-sky-500/20">
-              <div className="w-full h-full bg-slate-900 rounded-[10px] flex items-center justify-center">
-                <Sparkles className="w-5 h-5 text-sky-400" />
-              </div>
+            <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0087FF] border border-blue-100 flex items-center justify-center font-bold shadow-2xs">
+              <Sparkle className="w-5 h-5 text-[#0087FF]" weight="fill" />
             </div>
             <div>
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-                Personal AI Copilot
-                <span className="text-xs px-2 py-0.5 bg-sky-50 text-sky-700 border border-sky-200 rounded-full font-semibold">
-                  Personal Assistant
-                </span>
+                Personal Copilot
               </h1>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 mt-0.5">
                 Membantu keuangan pribadi, target tabungan, dan agenda kegiatan Anda.
               </p>
             </div>
@@ -353,16 +349,16 @@ Apa yang bisa saya bantu hari ini?`,
               className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
-                  <Bot className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0087FF] border border-blue-100 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                  <Sparkle className="w-4 h-4 text-[#0087FF]" weight="fill" />
                 </div>
               )}
 
               <div className={`max-w-[85%] sm:max-w-[80%] flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div
-                  className={`rounded-2xl px-4 py-3 shadow-sm ${
+                  className={`rounded-2xl px-4 py-3 shadow-2xs ${
                     msg.role === 'user'
-                      ? 'bg-gradient-to-r from-sky-600 to-blue-600 text-white rounded-br-none'
+                      ? 'bg-[#0087FF] text-white rounded-br-none'
                       : 'bg-white text-slate-800 border border-slate-200/90 rounded-bl-none'
                   }`}
                 >
@@ -405,8 +401,8 @@ Apa yang bisa saya bantu hari ini?`,
               </div>
 
               {msg.role === 'user' && (
-                <div className="w-8 h-8 rounded-lg bg-slate-800 text-white flex items-center justify-center shrink-0 shadow-sm mt-0.5">
-                  <User className="w-4 h-4" />
+                <div className="w-8 h-8 rounded-lg bg-slate-100 text-slate-700 border border-slate-200 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                  <User className="w-4 h-4 text-slate-600" />
                 </div>
               )}
             </div>
@@ -417,9 +413,9 @@ Apa yang bisa saya bantu hari ini?`,
               <div className="w-8 h-8 rounded-lg bg-sky-600 text-white flex items-center justify-center shrink-0 shadow-sm">
                 <Bot className="w-4 h-4" />
               </div>
-              <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-none px-4 py-3 shadow-sm flex items-center gap-2.5">
-                <Loader2 className="w-4 h-4 text-sky-600 animate-spin" />
-                <span className="text-xs text-slate-500 font-medium animate-pulse">KitaAtur AI sedang menganalisis data pribadi Anda...</span>
+              <div className="bg-white border border-slate-200/90 rounded-2xl rounded-bl-none px-4 py-3 shadow-2xs flex items-center gap-2.5">
+                <Loader2 className="w-4 h-4 text-[#0087FF] animate-spin" />
+                <span className="text-xs text-slate-500 font-medium">Menganalisis data...</span>
               </div>
             </div>
           )}
@@ -447,13 +443,13 @@ Apa yang bisa saya bantu hari ini?`,
               }}
               rows={2}
               placeholder="Tanyakan analisis keuangan pribadi, susun agenda, atau strategi tabungan..."
-              className="flex-1 max-h-36 px-4 py-2.5 text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-sky-500 focus:bg-white resize-none transition"
+              className="flex-1 max-h-36 px-4 py-2.5 text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#0087FF] focus:bg-white resize-none transition"
             />
 
             <button
               type="submit"
               disabled={!input.trim() || loading}
-              className="h-[48px] px-5 bg-gradient-to-r from-sky-600 to-blue-600 hover:from-sky-700 hover:to-blue-700 text-white font-medium text-sm rounded-xl shadow-md shadow-sky-500/20 flex items-center justify-center gap-2 transition active:scale-95 disabled:opacity-40 disabled:pointer-events-none"
+              className="h-[48px] px-5 bg-[#0087FF] hover:bg-blue-600 active:scale-95 text-white font-medium text-sm rounded-xl shadow-xs flex items-center justify-center gap-2 transition disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
             >
               <Send className="w-4 h-4" />
               <span>Kirim</span>
@@ -461,7 +457,7 @@ Apa yang bisa saya bantu hari ini?`,
           </form>
           <div className="flex items-center justify-between mt-2 px-1 text-[11px] text-slate-400">
             <span>Tekan <strong>Enter</strong> untuk mengirim, <strong>Shift+Enter</strong> untuk baris baru</span>
-            <span>Google Gemini 2.5 Flash</span>
+            <span>Personal Copilot</span>
           </div>
         </div>
       </div>

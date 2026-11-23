@@ -9,8 +9,8 @@ export default function AiAgentFloatingButton() {
   const [isOpen, setIsOpen] = useState(false)
   const pathname = usePathname()
 
-  // Do not render in kiosk or public landing pages
-  if (!pathname || pathname === '/' || pathname.includes('/attendance/kiosk') || pathname.startsWith('/auth') || pathname.startsWith('/admin')) {
+  // Do not render in kiosk, assistant page, or public landing pages
+  if (!pathname || pathname === '/' || pathname.includes('/attendance/kiosk') || pathname.includes('/assistant') || pathname.startsWith('/auth') || pathname.startsWith('/admin')) {
     return null
   }
 
