@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { prisma } from '../config/db';
+import { sendAttendanceNotification } from '../services/whatsapp.service';
 
 // 1. Get all participating Edu schools
 export async function getEduSchools(req: Request, res: Response) {
@@ -151,10 +152,32 @@ export async function getStudentStats(req: Request, res: Response) {
       percentage = Math.min(100, Math.round(((tepat + terlambat) / applicableSessions.length) * 100));
     }
 
+    const [violations, totalViolationPoints] = await Promise.all([
+      prisma.student_violations.findMany({
+        where: { guest_id: student.id },
+        orderBy: { occurred_at: 'desc' }
+      }),
+      prisma.student_violations.aggregate({
+        where: { guest_id: student.id },
+        _sum: { points: true }
+      })
+    ]);
+
     return res.json({
       student: {
         name: student.name,
         identifier: student.identifier,
+        totalViolationPoints: totalViolationPoints._sum.points || 0,
+        violations: violations.map(v => ({
+          id: v.id,
+          title: v.title,
+          category: v.category,
+          points: v.points,
+          action_taken: v.action_taken,
+          notes: v.notes,
+          occurred_at: v.occurred_at,
+          status: v.status
+        })),
         stats: {
           tepat,
           terlambat,
@@ -275,6 +298,21 @@ export async function submitStudentLeave(req: Request, res: Response) {
         proof_url: proof_url || null
       }
     });
+
+    const cd = (student.custom_data as any) || {};
+    sendAttendanceNotification(
+      orgId,
+      {
+        id: student.id,
+        name: student.name,
+        identifier: student.identifier,
+        parentPhone: cd.parent_phone,
+        kelas: cd.kelas
+      },
+      type === 'sakit' ? 'sakit' : 'izin',
+      notes || (type === 'sakit' ? 'Keterangan Sakit' : 'Permohonan Izin'),
+      new Date()
+    ).catch(e => console.error('[WA leave notify error]', e));
 
     return res.json({ success: true, message: 'Pengajuan absen berhasil disimpan.', leave });
   } catch (error) {

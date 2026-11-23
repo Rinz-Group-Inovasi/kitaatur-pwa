@@ -2,6 +2,7 @@ import { Request, Response } from 'express'
 import { prisma } from '../config/db'
 import { sendPushNotification } from './notification.controller'
 import { ensureTodayScheduledSessions } from '../jobs/session.job'
+import { sendAttendanceNotification, normalizePhoneNumber } from '../services/whatsapp.service'
 
 // Helper function to calculate distance using Haversine formula
 function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
@@ -543,8 +544,10 @@ export const getGuests = async (req: Request, res: Response) => {
         ...guest,
         check_in_time: guest.guest_attendance?.[0]?.check_in_time || null,
         status: finalStatus,
-        kelas: (guest.custom_data && guest.custom_data.kelas) ? guest.custom_data.kelas : null,
-        nfc_uid: (guest.custom_data && guest.custom_data.nfc_uid) ? guest.custom_data.nfc_uid : null
+        kelas: (guest.custom_data && (guest.custom_data as any).kelas) ? (guest.custom_data as any).kelas : null,
+        nfc_uid: (guest.custom_data && (guest.custom_data as any).nfc_uid) ? (guest.custom_data as any).nfc_uid : null,
+        parent_phone: (guest.custom_data && (guest.custom_data as any).parent_phone) ? (guest.custom_data as any).parent_phone : null,
+        parent_name: (guest.custom_data && (guest.custom_data as any).parent_name) ? (guest.custom_data as any).parent_name : null
       };
     });
 
@@ -577,12 +580,16 @@ export const uploadGuests = async (req: Request, res: Response) => {
     // Deduplicate the incoming payload by name (keep the last occurrence)
     const uniqueGuestsMap = new Map();
     validGuests.forEach(g => {
+      const rawWa = (g as any).parent_phone || (g as any).no_wa_ortu || (g as any).wa_ortu || (g as any).parent_wa || (g as any).telepon_ortu || (g as any).wa;
+      const cleanWa = rawWa ? normalizePhoneNumber(String(rawWa)) : null;
       // Key by lowercase name to prevent same-name duplicates in the upload itself
       uniqueGuestsMap.set(String(g.name).trim().toLowerCase(), { 
         name: String(g.name).trim(), 
         identifier: String(g.identifier).trim(),
         kelas: g.kelas ? String(g.kelas).trim() : null,
-        nfc_uid: (g.nfc_uid || g.nfc || g.uid) ? String(g.nfc_uid || g.nfc || g.uid).trim() : null
+        nfc_uid: (g.nfc_uid || (g as any).nfc || (g as any).uid) ? String(g.nfc_uid || (g as any).nfc || (g as any).uid).trim() : null,
+        parent_phone: cleanWa,
+        parent_name: ((g as any).parent_name || (g as any).nama_ortu) ? String((g as any).parent_name || (g as any).nama_ortu).trim() : null
       });
     });
     const uniqueGuests = Array.from(uniqueGuestsMap.values());
@@ -603,7 +610,9 @@ export const uploadGuests = async (req: Request, res: Response) => {
         const mergedCustomData = {
           ...prevCustomData,
           ...(g.kelas ? { kelas: g.kelas } : {}),
-          ...(g.nfc_uid ? { nfc_uid: g.nfc_uid } : {})
+          ...(g.nfc_uid ? { nfc_uid: g.nfc_uid } : {}),
+          ...(g.parent_phone ? { parent_phone: g.parent_phone } : {}),
+          ...(g.parent_name ? { parent_name: g.parent_name } : {})
         };
         return prisma.org_guests.update({
           where: { id: existingGuest.id },
@@ -617,6 +626,8 @@ export const uploadGuests = async (req: Request, res: Response) => {
         const customData: any = {};
         if (g.kelas) customData.kelas = g.kelas;
         if (g.nfc_uid) customData.nfc_uid = g.nfc_uid;
+        if (g.parent_phone) customData.parent_phone = g.parent_phone;
+        if (g.parent_name) customData.parent_name = g.parent_name;
         return prisma.org_guests.create({
           data: {
             organization_id: org.id,
@@ -902,6 +913,21 @@ export const scanGuestQR = async (req: Request, res: Response) => {
           check_in_time: now
         }
       });
+
+      // Notifikasi WA Orang Tua (asinkron non-blocking)
+      sendAttendanceNotification(
+        org.id,
+        {
+          id: guest.id,
+          name: guest.name,
+          identifier: guest.identifier,
+          parentPhone: (guest.custom_data as any)?.parent_phone,
+          kelas: (guest.custom_data as any)?.kelas
+        },
+        'masuk',
+        'Tepat Waktu',
+        now
+      ).catch(e => console.error('[WA QR notify error]', e));
 
       return res.status(200).json({ 
         message: `Berhasil check-in: ${guest.name} (Tamu/Peserta)`, 
@@ -2265,6 +2291,47 @@ export async function processNfcTap(req: any, res: Response) {
         where: { session_id: session.id, guest_id: matchedGuest.id }
       });
 
+      if (isCheckOutWindow && existing) {
+        if (existing.check_out_time) {
+          return res.status(200).json({
+            success: true,
+            alreadyRecorded: true,
+            isCheckOut: true,
+            student: studentInfo,
+            status: existing.status,
+            checkInTime: existing.check_out_time,
+            message: `${studentInfo.name} sudah absen pulang sebelumnya.`
+          });
+        }
+        await prisma.guest_attendance.update({
+          where: { id: existing.id },
+          data: { check_out_time: now }
+        });
+
+        sendAttendanceNotification(
+          org.id,
+          {
+            id: matchedGuest.id,
+            name: matchedGuest.name,
+            identifier: matchedGuest.identifier,
+            parentPhone: (matchedGuest.custom_data as any)?.parent_phone,
+            kelas: (matchedGuest.custom_data as any)?.kelas
+          },
+          'pulang',
+          'Selesai Kegiatan Belajar',
+          now
+        ).catch(e => console.error('[WA tap notify error]', e));
+
+        return res.status(200).json({
+          success: true,
+          isCheckOut: true,
+          student: studentInfo,
+          status: existing.status,
+          checkInTime: now,
+          message: `Absen Pulang Berhasil: ${studentInfo.name}`
+        });
+      }
+
       if (existing) {
         const timeDiffSeconds = (now.getTime() - new Date(existing.created_at).getTime()) / 1000;
         // Debounce: jika kartu baru saja di-tap dalam 15 detik terakhir
@@ -2298,6 +2365,20 @@ export async function processNfcTap(req: any, res: Response) {
           check_in_time: now
         }
       });
+
+      sendAttendanceNotification(
+        org.id,
+        {
+          id: matchedGuest.id,
+          name: matchedGuest.name,
+          identifier: matchedGuest.identifier,
+          parentPhone: (matchedGuest.custom_data as any)?.parent_phone,
+          kelas: (matchedGuest.custom_data as any)?.kelas
+        },
+        'masuk',
+        status === 'late' ? 'Terlambat' : 'Tepat Waktu',
+        now
+      ).catch(e => console.error('[WA tap notify error]', e));
 
       return res.status(200).json({
         success: true,

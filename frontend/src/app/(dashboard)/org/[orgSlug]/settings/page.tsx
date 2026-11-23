@@ -49,6 +49,7 @@ import { CustomUpload } from '@/components/ui/CustomUpload'
 import { useConfirm } from '@/components/ui/ConfirmDialog'
 import SpotlightTour, { TourStep } from '@/components/ui/SpotlightTour'
 import { QRCodeSVG } from 'qrcode.react'
+import SchoolWhatsAppConnector from '@/components/school/SchoolWhatsAppConnector'
 
 type ViewType = 'main' | 'profile' | 'security' | 'org_profile' | 'switcher' | 'about' | 'org_custom_fields' | 'member_custom_data' | 'org_family' | 'my_qr'
 
@@ -1481,6 +1482,11 @@ export default function OrgSettingsPage() {
                           className="w-full p-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-[#0087FF] outline-none font-medium bg-white disabled:bg-slate-50 disabled:text-slate-500"
                         />
                         <p className="text-xs text-slate-400 mt-1">Berikan PIN ini kepada wali murid agar mereka bisa mengakses data siswa.</p>
+                      </div>
+
+                      {/* Bot WhatsApp Sekolah (Baileys) */}
+                      <div className="pt-2">
+                        <SchoolWhatsAppConnector orgSlug={orgSlug} isLeader={isLeader} />
                       </div>
                     </div>
                   )}

@@ -22,7 +22,10 @@ import {
   AlertCircle, 
   Trash2, 
   Check, 
-  RefreshCw 
+  RefreshCw,
+  Phone,
+  MessageCircle,
+  Smartphone 
 } from 'lucide-react'
 import { kioskAudio } from '@/lib/kioskAudio'
 
@@ -50,6 +53,40 @@ function GuestsContent() {
   const [autoAdvance, setAutoAdvance] = useState(true)
   const [conflictData, setConflictData] = useState<{ uid: string; assignedTo: any } | null>(null)
   const [lastLinkedSuccess, setLastLinkedSuccess] = useState<string | null>(null)
+
+  // WhatsApp Pairing Modal State
+  const [showPairWaModal, setShowPairWaModal] = useState(false)
+  const [waStudent, setWaStudent] = useState<any | null>(null)
+  const [waPhoneInput, setWaPhoneInput] = useState('')
+  const [waNameInput, setWaNameInput] = useState('')
+  const [isSavingWa, setIsSavingWa] = useState(false)
+
+  const openPairWaModal = (student: any) => {
+    setWaStudent(student)
+    setWaPhoneInput(student.parent_phone || '')
+    setWaNameInput(student.parent_name || '')
+    setShowPairWaModal(true)
+  }
+
+  const handleSaveParentWa = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!waStudent) return
+    setIsSavingWa(true)
+    try {
+      const res = await api.post(`/whatsapp/${orgSlug}/pair-parent`, {
+        guestId: waStudent.id,
+        parentPhone: waPhoneInput.trim(),
+        parentName: waNameInput.trim()
+      })
+      toast.success(res.data.message || 'Nomor WhatsApp berhasil ditautkan!')
+      setShowPairWaModal(false)
+      fetchGuests()
+    } catch (err: any) {
+      toast.error(err.response?.data?.error || 'Gagal menautkan nomor WhatsApp')
+    } finally {
+      setIsSavingWa(false)
+    }
+  }
 
   // Hardware Keypress Listener Buffer for USB NFC Reader in Modal
   const bufferRef = useRef('')
@@ -92,7 +129,9 @@ function GuestsContent() {
       { header: 'Nama', key: 'nama', width: 30 },
       { header: 'ID', key: 'id', width: 25, style: { numFmt: '@' } }, // Format as Text
       { header: 'Kelas', key: 'kelas', width: 15 },
-      { header: 'NFC_UID', key: 'nfc_uid', width: 20 }
+      { header: 'NFC_UID', key: 'nfc_uid', width: 20 },
+      { header: 'No_WA_Ortu', key: 'no_wa_ortu', width: 20 },
+      { header: 'Nama_Ortu', key: 'nama_ortu', width: 25 }
     ]
 
     // Header styling
@@ -100,8 +139,8 @@ function GuestsContent() {
     worksheet.getRow(1).alignment = { horizontal: 'center' }
 
     // Add Sample Data
-    worksheet.addRow({ nama: 'Budi Santoso', id: '10A-12345', kelas: '10A', nfc_uid: '04A1B2C3D4' })
-    worksheet.addRow({ nama: 'Siti Aminah', id: '10B-98765', kelas: '10B', nfc_uid: '' })
+    worksheet.addRow({ nama: 'Budi Santoso', id: '10A-12345', kelas: '10A', nfc_uid: '04A1B2C3D4', no_wa_ortu: '081234567890', nama_ortu: 'Santoso' })
+    worksheet.addRow({ nama: 'Siti Aminah', id: '10B-98765', kelas: '10B', nfc_uid: '', no_wa_ortu: '089876543210', nama_ortu: 'Ahmad' })
     
     // Add extra empty rows with text formatting for ID column
     for(let i = 0; i < 50; i++) {
@@ -132,9 +171,11 @@ function GuestsContent() {
         // Parse data
         const payload = data.map((row: any) => ({
           name: String(row['Nama'] || row['nama'] || row['Name'] || row['name'] || '').trim(),
-          identifier: String(row['ID'] || row['id'] || row['Identifier'] || row['NIM'] || row['nim'] || row['NIK'] || '').trim(),
+          identifier: String(row['ID'] || row['id'] || row['Identifier'] || row['NIM'] || row['nim'] || row['NIK'] || row['NIS'] || row['nis'] || '').trim(),
           kelas: row['Kelas'] || row['kelas'] || row['Class'] || row['class'] ? String(row['Kelas'] || row['kelas'] || row['Class'] || row['class']).trim() : null,
-          nfc_uid: row['NFC_UID'] || row['nfc_uid'] || row['NFC'] || row['nfc'] || row['UID'] || row['uid'] ? String(row['NFC_UID'] || row['nfc_uid'] || row['NFC'] || row['nfc'] || row['UID'] || row['uid']).trim() : null
+          nfc_uid: row['NFC_UID'] || row['nfc_uid'] || row['NFC'] || row['nfc'] || row['UID'] || row['uid'] ? String(row['NFC_UID'] || row['nfc_uid'] || row['NFC'] || row['nfc'] || row['UID'] || row['uid']).trim() : null,
+          parent_phone: row['No_WA_Ortu'] || row['no_wa_ortu'] || row['WA_Ortu'] || row['wa_ortu'] || row['Nomor_WA'] || row['nomor_wa'] || row['Telepon_Ortu'] || row['telepon_ortu'] || row['No_WA'] ? String(row['No_WA_Ortu'] || row['no_wa_ortu'] || row['WA_Ortu'] || row['wa_ortu'] || row['Nomor_WA'] || row['nomor_wa'] || row['Telepon_Ortu'] || row['telepon_ortu'] || row['No_WA']).trim() : null,
+          parent_name: row['Nama_Ortu'] || row['nama_ortu'] || row['Wali'] || row['wali'] ? String(row['Nama_Ortu'] || row['nama_ortu'] || row['Wali'] || row['wali']).trim() : null
         })).filter(g => g.name && g.identifier)
 
         if (payload.length === 0) {
@@ -620,6 +661,28 @@ function GuestsContent() {
                               </button>
                             )}
                           </div>
+
+                          {/* WA Ortu on Mobile */}
+                          <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100 mt-1">
+                            <span className="text-xs font-semibold text-slate-500">WA Ortu:</span>
+                            {g.parent_phone ? (
+                              <button
+                                onClick={() => openPairWaModal(g)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 active:scale-95"
+                              >
+                                <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>+{g.parent_phone}</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => openPairWaModal(g)}
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 active:scale-95 hover:bg-emerald-100"
+                              >
+                                <Phone className="w-3.5 h-3.5" />
+                                <span>+ Tautkan WA</span>
+                              </button>
+                            )}
+                          </div>
                         </div>
                       </div>
                       
@@ -670,6 +733,7 @@ function GuestsContent() {
                         <th className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-600">Kelas</th>
                         <th className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-600">ID / NIS</th>
                         <th className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-600">Kartu NFC Fisik</th>
+                        <th className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-600">WhatsApp Ortu</th>
                         <th className="px-4 py-3 text-xs font-extrabold uppercase tracking-wider text-slate-600 text-right">Status Kehadiran</th>
                       </tr>
                     </thead>
@@ -710,6 +774,26 @@ function GuestsContent() {
                               >
                                 <CreditCard className="w-3.5 h-3.5" />
                                 <span>+ Tautkan Kartu</span>
+                              </button>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {g.parent_phone ? (
+                              <button
+                                onClick={() => openPairWaModal(g)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-mono font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors shadow-xs active:scale-95"
+                                title="Klik untuk mengubah nomor WhatsApp"
+                              >
+                                <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>+{g.parent_phone}</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => openPairWaModal(g)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 transition-colors active:scale-95"
+                              >
+                                <Phone className="w-3.5 h-3.5" />
+                                <span>+ Tautkan WA</span>
                               </button>
                             )}
                           </td>
@@ -970,6 +1054,89 @@ function GuestsContent() {
               </button>
             </div>
 
+          </div>
+        </div>
+      )}
+
+      {/* Modal Tautkan WhatsApp Orang Tua */}
+      {showPairWaModal && waStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-xl border border-slate-100 space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold">
+                  <Smartphone className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-slate-900 text-sm">Tautkan WhatsApp Orang Tua</h3>
+                  <p className="text-xs text-slate-500">Notifikasi presensi & BK otomatis</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPairWaModal(false)}
+                className="text-slate-400 hover:text-slate-600 text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1">
+              <p className="text-xs font-bold text-slate-800">{waStudent.name}</p>
+              <p className="text-[11px] text-slate-500">
+                NIS: <span className="font-mono">{waStudent.identifier}</span> {waStudent.kelas ? `• Kelas ${waStudent.kelas}` : ''}
+              </p>
+            </div>
+
+            <form onSubmit={handleSaveParentWa} className="space-y-4 pt-1">
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nomor WhatsApp Orang Tua / Wali
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: 081234567890"
+                  value={waPhoneInput}
+                  onChange={(e) => setWaPhoneInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:border-emerald-500 transition font-mono"
+                  autoFocus
+                  required
+                />
+                <p className="text-[11px] text-slate-400 mt-1">
+                  Format bisa diawali 08... atau 628... Sistem akan otomatis menormalkan ke format internasional.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-700 mb-1">
+                  Nama Orang Tua / Wali (Opsional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="Contoh: Bpk. Santoso"
+                  value={waNameInput}
+                  onChange={(e) => setWaNameInput(e.target.value)}
+                  className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 outline-none focus:border-emerald-500 transition"
+                />
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowPairWaModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 rounded-xl transition"
+                >
+                  Batal
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingWa || !waPhoneInput.trim()}
+                  className="px-4 py-2 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition shadow-sm disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isSavingWa ? 'Menyimpan...' : 'Simpan Nomor WA'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

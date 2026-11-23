@@ -38,3 +38,8 @@ next-env.d.ts
 # dist
 dist/
 frontend/.next/
+
+# storage and credentials
+storage/
+*.session
+whatsapp_sessions/

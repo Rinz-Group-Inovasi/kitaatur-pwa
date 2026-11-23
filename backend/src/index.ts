@@ -21,6 +21,12 @@ import scheduleRoutes from './routes/schedule.routes'
 import schoolRoutes from './routes/school.routes'
 import adminRoutes from './routes/admin.routes'
 import trialRoutes from './routes/trial.routes'
+import aiAgentRoutes from './routes/ai-agent.routes'
+import letterRoutes from './routes/letter.routes'
+import inventoryRoutes from './routes/inventory.routes'
+import whatsappRoutes from './routes/whatsapp.routes'
+import violationRoutes from './routes/violation.routes'
+import { initActiveWhatsAppSessions } from './services/whatsapp.service'
 
 import { maintenanceCheck } from './middleware/maintenance.middleware'
 import { antiScriptBotGuard } from './middleware/antiScript.middleware'
@@ -28,6 +34,7 @@ import { antiScriptBotGuard } from './middleware/antiScript.middleware'
 import { initJobs } from './jobs/reminder.job'
 import { initSessionJobs } from './jobs/session.job'
 import { initCleanupJob } from './jobs/cleanup.job'
+import { initAiDigestJob } from './jobs/ai-digest.job'
 
 const app = express()
 const port = process.env.PORT || 5000
@@ -53,6 +60,8 @@ app.use(limiter)
 initJobs()
 initSessionJobs()
 initCleanupJob()
+initAiDigestJob()
+initActiveWhatsAppSessions()
 
 // Handle Chrome Private Network Access (PNA) block for Railway IPv6 addresses
 app.use((req, res, next) => {
@@ -92,6 +101,11 @@ app.use('/api/org-schedule', scheduleRoutes)
 app.use('/api/school', schoolRoutes)
 app.use('/api/admin', adminRoutes)
 app.use('/api/trial', trialRoutes)
+app.use('/api/ai', aiAgentRoutes)
+app.use('/api/org-letter', letterRoutes)
+app.use('/api/org-inventory', inventoryRoutes)
+app.use('/api/whatsapp', whatsappRoutes)
+app.use('/api/org-violation', violationRoutes)
 
 // Health check endpoint
 app.get('/health', (req, res) => {

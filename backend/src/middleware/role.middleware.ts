@@ -6,7 +6,7 @@ import { org_member_role } from '@prisma/client'
 export interface OrganizationRequest extends AuthenticatedRequest {
   orgMember?: {
     organizationId: string
-    role: org_member_role | 'auditor' | 'vice_head'
+    role: org_member_role | 'auditor' | 'vice_head' | 'bk'
   }
 }
 
@@ -32,7 +32,7 @@ const getAdminEmails = (): string[] => {
   return env.split(',').map((e) => e.trim().toLowerCase())
 }
 
-export function requireOrgRole(allowedRoles: (org_member_role | 'auditor' | 'vice_head')[]) {
+export function requireOrgRole(allowedRoles: (org_member_role | 'auditor' | 'vice_head' | 'bk')[]) {
   return async (req: OrganizationRequest, res: Response, next: NextFunction) => {
     const userId = req.user?.id
     const orgIdOrSlug = req.params.orgIdOrSlug
@@ -146,7 +146,7 @@ export function requireOrgRole(allowedRoles: (org_member_role | 'auditor' | 'vic
 
       req.orgMember = {
         organizationId: membership.organization_id,
-        role: membership.role as (org_member_role | 'auditor' | 'vice_head')
+        role: membership.role as (org_member_role | 'auditor' | 'vice_head' | 'bk')
       }
 
       next()

@@ -17,12 +17,16 @@ import {
   TreeStructure, 
   CaretDown,
   Users,
-  IdentificationCard
+  IdentificationCard,
+  Sparkle,
+  EnvelopeSimple,
+  ShieldWarning
 } from '@phosphor-icons/react'
 import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import { useDashboardStore } from '@/lib/dashboard-store'
 import { dispatchNativeNotification } from '@/components/ui/NativeNotificationBanner'
+import AiAgentFloatingButton from '@/components/ai/AiAgentFloatingButton'
 
 interface DashboardShellProps {
   children: React.ReactNode
@@ -324,6 +328,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   // Menentukan nav item berdasarkan konteks
   const personalNavItems = [
     { name: 'Ringkasan', href: '/personal/dashboard', icon: House },
+    { name: 'AI Copilot', href: '/personal/assistant', icon: Sparkle },
     primaryOrgSlug 
       ? { 
           name: isPrimarySchool ? 'Dasbor Eksekutif' : 'Organisasi', 
@@ -337,16 +342,23 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
   const schoolNavItems = currentOrgSlug ? [
     { name: 'Dashboard', href: `/org/${currentOrgSlug}/executive`, icon: Buildings },
+    { name: 'AI Copilot', href: `/org/${currentOrgSlug}/assistant`, icon: Sparkle },
     { name: 'Presensi', href: `/org/${currentOrgSlug}/attendance`, icon: QrCode },
     { name: 'Siswa & NFC', href: `/org/${currentOrgSlug}/attendance/guests`, icon: IdentificationCard },
+    { name: 'Pelanggaran & BK', href: `/org/${currentOrgSlug}/violations`, icon: ShieldWarning },
+    { name: 'Arsip Surat', href: `/org/${currentOrgSlug}/letters`, icon: EnvelopeSimple },
+    { name: 'Inventaris', href: `/org/${currentOrgSlug}/inventory`, icon: Package },
     { name: 'Guru & Staf', href: `/org/${currentOrgSlug}/members`, icon: Users },
     { name: 'Pengaturan', href: `/org/${currentOrgSlug}/settings`, icon: GearSix },
   ] : []
 
   const regularOrgNavItems = currentOrgSlug ? [
     { name: 'Org Dashboard', href: `/org/${currentOrgSlug}/dashboard`, icon: Buildings },
+    { name: 'AI Copilot', href: `/org/${currentOrgSlug}/assistant`, icon: Sparkle },
     { name: 'Presensi', href: `/org/${currentOrgSlug}/attendance`, icon: QrCode },
     { name: 'Keuangan', href: `/org/${currentOrgSlug}/financial`, icon: Wallet },
+    { name: 'Arsip Surat', href: `/org/${currentOrgSlug}/letters`, icon: EnvelopeSimple },
+    { name: 'Inventaris', href: `/org/${currentOrgSlug}/inventory`, icon: Package },
     { name: 'Pengaturan', href: `/org/${currentOrgSlug}/settings`, icon: GearSix },
   ] : []
 
@@ -369,13 +381,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
       { 
         section: isCurrentSchool ? 'RUANG EKSEKUTIF SEKOLAH' : 'ORGANIZATION SPACE', 
         items: isCurrentSchool 
-          ? [
-              { name: 'Dashboard Eksekutif', href: `/org/${currentOrgSlug}/executive`, icon: Buildings },
-              { name: 'Presensi & Sesi', href: `/org/${currentOrgSlug}/attendance`, icon: QrCode },
-              { name: 'Data Siswa & NFC', href: `/org/${currentOrgSlug}/attendance/guests`, icon: IdentificationCard },
-              { name: 'Anggota & Guru', href: `/org/${currentOrgSlug}/members`, icon: Users },
-              { name: 'Pengaturan Sekolah', href: `/org/${currentOrgSlug}/settings`, icon: GearSix },
-            ]
+          ? schoolNavItems
           : regularOrgNavItems 
       },
       { section: 'PERSONAL SPACE', items: [{ name: 'Keuangan Pribadi', href: '/personal/dashboard', icon: House }] }
@@ -618,6 +624,9 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           })}
         </div>
       </nav>
+
+      {/* Floating AI Copilot Assistant Button */}
+      <AiAgentFloatingButton />
 
     </div>
   )

@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react'
 import { api } from '@/lib/api'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Search, GraduationCap, CheckCircle, Clock, AlertTriangle, UserCircle, X, ChevronDown } from 'lucide-react'
+import { ArrowLeft, Search, GraduationCap, CheckCircle, Clock, AlertTriangle, UserCircle, X, ChevronDown, ShieldAlert } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { CustomUpload } from '@/components/ui/CustomUpload'
 
@@ -27,6 +27,7 @@ export default function EduStudentDashboardPage() {
   const [uploadingProof, setUploadingProof] = useState(false)
   const [viewProofUrl, setViewProofUrl] = useState<string | null>(null)
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [activeTab, setActiveTab] = useState<'attendance' | 'violations'>('attendance')
 
   useEffect(() => {
     // Check PIN from session storage
@@ -308,7 +309,35 @@ export default function EduStudentDashboardPage() {
               </button>
             </div>
 
-            {studentData.history && studentData.history.length > 0 && (
+            {/* Tab Selector: Presensi vs Pelanggaran */}
+            <div className="flex border-b border-slate-200 gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setActiveTab('attendance')}
+                className={`pb-3 text-sm font-bold border-b-2 transition ${
+                  activeTab === 'attendance'
+                    ? 'border-[#0087FF] text-[#0087FF]'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                Riwayat Kehadiran Sesi
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('violations')}
+                className={`pb-3 text-sm font-bold border-b-2 transition flex items-center gap-1.5 ${
+                  activeTab === 'violations'
+                    ? 'border-rose-600 text-rose-600'
+                    : 'border-transparent text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                <ShieldAlert className="w-4 h-4" />
+                <span>Catatan Pelanggaran & Poin BK ({studentData.violations?.length || 0})</span>
+              </button>
+            </div>
+
+            {/* Tab 1: Kehadiran Sesi */}
+            {activeTab === 'attendance' && studentData.history && studentData.history.length > 0 && (
               <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mt-6">
                 <div className="p-5 border-b border-slate-100 bg-slate-50">
                   <h3 className="font-bold text-slate-800">Riwayat Kehadiran Sesi</h3>
@@ -387,6 +416,84 @@ export default function EduStudentDashboardPage() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Tab 2: Catatan Pelanggaran Siswa */}
+            {activeTab === 'violations' && (
+              <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden mt-6">
+                <div className="p-5 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-bold text-slate-800">Catatan Pelanggaran Tata Tertib & Bimbingan Konseling</h3>
+                    <p className="text-xs text-slate-500 mt-0.5">Transparansi poin pembinaan siswa bagi orang tua / wali murid</p>
+                  </div>
+                  <span className={`px-3 py-1 rounded-xl text-xs font-black font-mono ${
+                    (studentData.totalViolationPoints || 0) > 30 
+                      ? 'bg-rose-100 text-rose-700 border border-rose-200' 
+                      : (studentData.totalViolationPoints || 0) > 10
+                      ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                      : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                  }`}>
+                    Total: {studentData.totalViolationPoints || 0} Poin
+                  </span>
+                </div>
+
+                {!studentData.violations || studentData.violations.length === 0 ? (
+                  <div className="p-10 text-center text-slate-500 space-y-2">
+                    <CheckCircle className="w-10 h-10 mx-auto text-emerald-500" />
+                    <p className="font-bold text-slate-800">Tidak Ada Catatan Pelanggaran</p>
+                    <p className="text-xs text-slate-400">Ananda memiliki catatan perilaku dan tata tertib yang sangat baik. Pertahankan!</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
+                    {studentData.violations.map((v: any) => (
+                      <div key={v.id} className="p-5 hover:bg-slate-50 transition-colors space-y-2">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap mb-1">
+                              <span className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                                v.category === 'berat'
+                                  ? 'bg-rose-100 text-rose-700 border border-rose-200'
+                                  : v.category === 'sedang'
+                                  ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                                  : 'bg-blue-100 text-[#007AE6] border border-[#0087FF]/20'
+                              }`}>
+                                {v.category}
+                              </span>
+                              <span className="text-xs font-black text-rose-600 font-mono">+{v.points} Poin</span>
+                              <span className="text-xs text-slate-400">•</span>
+                              <span className="text-xs text-slate-500">
+                                {new Date(v.occurred_at).toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+                              </span>
+                            </div>
+                            <h4 className="font-bold text-slate-900 text-sm">{v.title}</h4>
+                            {v.notes && <p className="text-xs text-slate-500 italic mt-0.5">"{v.notes}"</p>}
+                          </div>
+
+                          <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold shrink-0 ${
+                            v.status === 'resolved'
+                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                              : v.status === 'in_counseling'
+                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                              : 'bg-slate-100 text-slate-600 border border-slate-200'
+                          }`}>
+                            {v.status === 'resolved' ? 'Selesai' : v.status === 'in_counseling' ? 'Dalam Pembinaan' : 'Dicatat'}
+                          </span>
+                        </div>
+
+                        {v.action_taken && (
+                          <div className="p-3 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-700">
+                            <strong>Tindakan Pembinaan BK:</strong> {v.action_taken}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="p-4 bg-slate-50 border-t border-slate-100 text-xs text-slate-500 text-center">
+                  Untuk konsultasi lebih lanjut terkait pembinaan siswa, orang tua dapat menghubungi Guru BK melalui pihak sekolah.
                 </div>
               </div>
             )}
