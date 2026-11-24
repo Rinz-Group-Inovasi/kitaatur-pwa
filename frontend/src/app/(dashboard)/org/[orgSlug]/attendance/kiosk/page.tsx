@@ -90,11 +90,15 @@ export default function NfcKioskPage() {
   const [manualSearching, setManualSearching] = useState(false)
   const [manualResults, setManualResults] = useState<any[]>([])
 
-  // Hardware Keypress Listener Buffer
+  // Hardware Keypress Listener Buffer & Fast Processing Queue
   const bufferRef = useRef('')
   const lastKeyTimeRef = useRef(0)
+  const submitTimerRef = useRef<NodeJS.Timeout | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const dismissTimerRef = useRef<NodeJS.Timeout | null>(null)
+  const inFlightRef = useRef(false)
+  const tapQueueRef = useRef<string[]>([])
+  const lastTapProcessedRef = useRef<{ uid: string; time: number } | null>(null)
 
   // 1. Update Jam & Tanggal Digital Real-Time
   useEffect(() => {
@@ -131,13 +135,39 @@ export default function NfcKioskPage() {
     return () => clearInterval(interval)
   }, [fetchKioskInfo])
 
-  // 3. Proses Tap Kartu NFC (Kirim UID ke Backend)
+  // 3. Proses Tap Kartu NFC (Kirim UID ke Backend dengan Antrian Responsif)
   const handleProcessCardUid = async (rawUid: string) => {
     const cleanUid = rawUid.trim()
-    if (!cleanUid || isProcessing) return
+    if (!cleanUid) return
 
+    // Debounce kartu yang sama persis jika di-tap berulang dalam 1.2 detik
+    const now = Date.now()
+    if (
+      lastTapProcessedRef.current &&
+      lastTapProcessedRef.current.uid.toLowerCase() === cleanUid.toLowerCase() &&
+      now - lastTapProcessedRef.current.time < 1200
+    ) {
+      return
+    }
+
+    // Jika request sebelumnya masih in-flight, masukkan ke antrian agar tidak hilang
+    if (inFlightRef.current) {
+      if (!tapQueueRef.current.includes(cleanUid)) {
+        tapQueueRef.current.push(cleanUid)
+      }
+      return
+    }
+
+    inFlightRef.current = true
     setIsProcessing(true)
     setErrorMessage(null)
+    lastTapProcessedRef.current = { uid: cleanUid, time: now }
+
+    // Batalkan dismiss timer yang sedang berjalan agar hasil baru langsung tampil
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current)
+      dismissTimerRef.current = null
+    }
 
     try {
       const res = await api.post(`/org-attendance/${orgSlug}/nfc/tap`, {
@@ -199,18 +229,28 @@ export default function NfcKioskPage() {
         kioskAudio.playError()
       }
     } finally {
+      inFlightRef.current = false
       setIsProcessing(false)
-      // Reset kartu notifikasi setelah 3.2 detik
+
+      // Reset kartu notifikasi setelah 2.2 detik (responsif dan cepat)
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current)
       dismissTimerRef.current = setTimeout(() => {
         setLastResult(null)
         setErrorMessage(null)
-      }, 3200)
+      }, 2200)
 
-      // Pastikan input buffer tetap fokus untuk tap berikutnya
+      // Pastikan input buffer tetap bersih & fokus untuk tap berikutnya
       if (inputRef.current) {
         inputRef.current.value = ''
         inputRef.current.focus()
+      }
+
+      // Jika ada kartu berikutnya dalam antrian, langsung proses tanpa jeda!
+      if (tapQueueRef.current.length > 0) {
+        const nextUid = tapQueueRef.current.shift()
+        if (nextUid) {
+          setTimeout(() => handleProcessCardUid(nextUid), 15)
+        }
       }
     }
   }
@@ -232,32 +272,47 @@ export default function NfcKioskPage() {
       const timeDiff = now - lastKeyTimeRef.current
       lastKeyTimeRef.current = now
 
-      // USB Reader biasanya mengetik karakter dengan jeda sangat cepat (< 60ms)
+      // Jika scanner mengirim Enter
       if (e.key === 'Enter') {
-        if (bufferRef.current.length >= 3) {
+        if (submitTimerRef.current) clearTimeout(submitTimerRef.current)
+        const capturedUid = bufferRef.current.trim() || inputRef.current?.value.trim() || ''
+        bufferRef.current = ''
+        if (inputRef.current) inputRef.current.value = ''
+
+        if (capturedUid.length >= 3) {
           e.preventDefault()
-          const capturedUid = bufferRef.current
-          bufferRef.current = ''
           handleProcessCardUid(capturedUid)
-        } else {
-          bufferRef.current = ''
         }
         return
       }
 
-      // Jika jeda pengetikan terlalu lama (> 150ms), kemungkinan manusia mengetik biasa, reset buffer
-      if (timeDiff > 150) {
+      // Toleransi jeda antar-karakter hingga 400ms agar scanner yang lambat tidak terpotong
+      if (timeDiff > 400) {
         bufferRef.current = ''
       }
 
-      if (e.key.length === 1) {
+      if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
         bufferRef.current += e.key
+
+        // Auto-detect tanpa perlu tekan Enter (jeda 65ms setelah karakter terakhir)
+        if (submitTimerRef.current) clearTimeout(submitTimerRef.current)
+        submitTimerRef.current = setTimeout(() => {
+          const captured = bufferRef.current.trim() || inputRef.current?.value.trim() || ''
+          if (captured.length >= 4) {
+            bufferRef.current = ''
+            if (inputRef.current) inputRef.current.value = ''
+            handleProcessCardUid(captured)
+          }
+        }, 65)
       }
     }
 
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [showManualModal, sessionData, customSessionId, isProcessing, soundEnabled])
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      if (submitTimerRef.current) clearTimeout(submitTimerRef.current)
+    }
+  }, [showManualModal, sessionData, customSessionId, soundEnabled])
 
   // Menjaga agar input tersembunyi selalu fokus
   const keepFocus = () => {
@@ -336,6 +391,29 @@ export default function NfcKioskPage() {
         className="opacity-0 absolute -top-96 left-0 pointer-events-none"
         autoFocus
         onBlur={() => setTimeout(keepFocus, 100)}
+        onChange={(e) => {
+          const val = e.target.value.trim()
+          if (val.length >= 4) {
+            if (submitTimerRef.current) clearTimeout(submitTimerRef.current)
+            submitTimerRef.current = setTimeout(() => {
+              if (inputRef.current) inputRef.current.value = ''
+              bufferRef.current = ''
+              handleProcessCardUid(val)
+            }, 60)
+          }
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            const val = e.currentTarget.value.trim() || bufferRef.current.trim()
+            if (val.length >= 3) {
+              e.preventDefault()
+              if (submitTimerRef.current) clearTimeout(submitTimerRef.current)
+              if (inputRef.current) inputRef.current.value = ''
+              bufferRef.current = ''
+              handleProcessCardUid(val)
+            }
+          }
+        }}
       />
 
       {/* TOP HEADER */}
@@ -530,8 +608,19 @@ export default function NfcKioskPage() {
             </div>
           )}
 
-          {/* Skenario 3: Idle / Standby Siap Tempel Kartu */}
-          {!lastResult && !errorMessage && (
+          {/* Skenario 3: Sedang Memproses / Membaca Kartu Secara Instan */}
+          {isProcessing && !lastResult && !errorMessage && (
+            <div className="w-full max-w-xl p-10 rounded-3xl bg-blue-50/70 border-2 border-blue-400 shadow-lg text-center flex flex-col items-center animate-in zoom-in-95 duration-100">
+              <div className="w-20 h-20 rounded-3xl bg-[#0087FF] text-white flex items-center justify-center shadow-lg ring-8 ring-blue-100 mb-4 animate-bounce">
+                <Radio className="w-10 h-10 animate-spin" />
+              </div>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 mb-1">Membaca Kartu NFC...</h3>
+              <p className="text-xs text-slate-500 font-mono">Memverifikasi kehadiran siswa...</p>
+            </div>
+          )}
+
+          {/* Skenario 4: Idle / Standby Siap Tempel Kartu */}
+          {!isProcessing && !lastResult && !errorMessage && (
             <div className="w-full max-w-xl p-10 rounded-3xl bg-white border-2 border-dashed border-[#0087FF]/40 shadow-xs text-center flex flex-col items-center">
               <div className="relative mb-5">
                 <div className="w-24 h-24 rounded-3xl bg-gradient-to-br from-[#E0F4FE] to-[#BAE6FD]/60 text-[#0087FF] flex items-center justify-center shadow-inner ring-8 ring-[#E0F4FE]/70 animate-pulse">

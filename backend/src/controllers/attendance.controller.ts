@@ -20,6 +20,25 @@ function calculateDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
   return R * c;
 }
 
+// Fast In-Memory Cache for Kiosk RFID/NFC Lookups (<1ms response time)
+const kioskStudentCache = new Map<string, { guest?: any; member?: any; expiresAt: number }>();
+const kioskOrgCache = new Map<string, { org: any; expiresAt: number }>();
+const kioskSessionCache = new Map<string, { session: any; expiresAt: number }>();
+
+export function invalidateKioskCache(orgId?: string, uid?: string) {
+  if (uid && orgId) {
+    kioskStudentCache.delete(`${orgId}:${uid.toLowerCase()}`);
+  } else if (orgId) {
+    for (const key of kioskStudentCache.keys()) {
+      if (key.startsWith(`${orgId}:`)) kioskStudentCache.delete(key);
+    }
+    kioskSessionCache.delete(orgId);
+  } else {
+    kioskStudentCache.clear();
+    kioskSessionCache.clear();
+  }
+}
+
 export async function createSession(req: any, res: Response) {
   const orgMemberContext = req.orgMember;
   const userId = req.user?.id;
@@ -2249,6 +2268,7 @@ export async function linkNfcCard(req: any, res: Response) {
       });
     }
 
+    invalidateKioskCache(org.id, cleanUid);
     return res.status(200).json({
       success: true,
       message: `Kartu NFC (${cleanUid}) berhasil ditautkan ke ${studentName}.`,
@@ -2295,6 +2315,7 @@ export async function unlinkNfcCard(req: any, res: Response) {
         await prisma.organization_members.update({ where: { id: targetId }, data: { custom_data: cd } });
       }
     }
+    invalidateKioskCache(orgIdOrSlug);
     return res.status(200).json({ success: true, message: 'Tautan kartu NFC berhasil dilepas.' });
   } catch (err) {
     console.error('Error unlinking NFC card:', err);
@@ -2316,35 +2337,85 @@ export async function processNfcTap(req: any, res: Response) {
   const sessionId = rawSessionId ? String(rawSessionId).trim() : undefined;
 
   try {
-    const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgIdOrSlug);
-    const org = await prisma.organizations.findFirst({
-      where: isId ? { id: orgIdOrSlug } : { slug: orgIdOrSlug },
-      select: { id: true, name: true, slug: true }
-    });
+    // 1. Resolve Organization (dengan in-memory cache 5 menit)
+    let org: any = null;
+    const orgCacheKey = orgIdOrSlug.toLowerCase();
+    const cachedOrg = kioskOrgCache.get(orgCacheKey);
+    if (cachedOrg && cachedOrg.expiresAt > Date.now()) {
+      org = cachedOrg.org;
+    } else {
+      const isId = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(orgIdOrSlug);
+      org = await prisma.organizations.findFirst({
+        where: isId ? { id: orgIdOrSlug } : { slug: orgIdOrSlug },
+        select: { id: true, name: true, slug: true }
+      });
+      if (org) {
+        kioskOrgCache.set(orgCacheKey, { org, expiresAt: Date.now() + 300000 });
+      }
+    }
     if (!org) return res.status(404).json({ error: 'Organisasi tidak ditemukan' });
 
-    // Cari siswa (org_guests) terlebih dahulu
-    const guests = await prisma.org_guests.findMany({
-      where: { organization_id: org.id },
-      select: { id: true, name: true, identifier: true, custom_data: true }
-    });
-    const matchedGuest = guests.find((g: any) => {
-      const cd = (g.custom_data as any) || {};
-      return (cd.nfc_uid && String(cd.nfc_uid).toLowerCase() === cleanUid.toLowerCase())
-        || (g.identifier && String(g.identifier).toLowerCase() === cleanUid.toLowerCase());
-    });
+    // 2. Resolve Siswa (dengan in-memory cache 60 detik + direct query)
+    const cacheKey = `${org.id}:${cleanUid.toLowerCase()}`;
+    const cachedStudent = kioskStudentCache.get(cacheKey);
 
+    let matchedGuest: any = null;
     let matchedMember: any = null;
-    if (!matchedGuest) {
-      const members = await prisma.organization_members.findMany({
-        where: { organization_id: org.id },
-        include: { profile: { select: { id: true, full_name: true, email: true, avatar_url: true } } }
-      });
-      matchedMember = members.find((m: any) => {
-        const cd = (m.custom_data as any) || {};
-        return (cd.nfc_uid && String(cd.nfc_uid).toLowerCase() === cleanUid.toLowerCase())
-          || (m.profile_id && String(m.profile_id).toLowerCase() === cleanUid.toLowerCase());
-      });
+
+    if (cachedStudent && cachedStudent.expiresAt > Date.now()) {
+      matchedGuest = cachedStudent.guest;
+      matchedMember = cachedStudent.member;
+    } else {
+      // Direct SQL lookup: mencari siswa spesifik dengan index langsung (< 50ms)
+      const guestResults: any[] = await prisma.$queryRaw`
+        SELECT id, name, identifier, custom_data
+        FROM org_guests
+        WHERE organization_id = ${org.id}::uuid
+          AND (
+            LOWER(identifier) = LOWER(${cleanUid})
+            OR LOWER(custom_data->>'nfc_uid') = LOWER(${cleanUid})
+          )
+        LIMIT 1
+      `;
+
+      if (guestResults && guestResults.length > 0) {
+        matchedGuest = guestResults[0];
+      } else {
+        const memberResults: any[] = await prisma.$queryRaw`
+          SELECT om.id, om.profile_id, om.custom_data, p.full_name, p.email, p.avatar_url
+          FROM organization_members om
+          JOIN profiles p ON p.id = om.profile_id
+          WHERE om.organization_id = ${org.id}::uuid
+            AND (
+              LOWER(om.profile_id::text) = LOWER(${cleanUid})
+              OR LOWER(om.custom_data->>'nfc_uid') = LOWER(${cleanUid})
+              OR LOWER(om.custom_data->>'nis') = LOWER(${cleanUid})
+            )
+          LIMIT 1
+        `;
+        if (memberResults && memberResults.length > 0) {
+          const m = memberResults[0];
+          matchedMember = {
+            id: m.id,
+            profile_id: m.profile_id,
+            custom_data: m.custom_data,
+            profile: {
+              id: m.profile_id,
+              full_name: m.full_name,
+              email: m.email,
+              avatar_url: m.avatar_url
+            }
+          };
+        }
+      }
+
+      if (matchedGuest || matchedMember) {
+        kioskStudentCache.set(cacheKey, {
+          guest: matchedGuest,
+          member: matchedMember,
+          expiresAt: Date.now() + 60000
+        });
+      }
     }
 
     if (!matchedGuest && !matchedMember) {
@@ -2357,24 +2428,36 @@ export async function processNfcTap(req: any, res: Response) {
 
     const now = new Date();
 
-    // Tentukan sesi presensi yang relevan
-    let session = null;
-    if (sessionId && sessionId.length === 36) {
-      session = await prisma.attendance_sessions.findUnique({
-        where: { id: sessionId }
-      });
-    }
+    // 3. Resolve Sesi Presensi Aktif (dengan in-memory cache 10 detik)
+    const sessionCacheKey = `${org.id}:${sessionId || 'active'}`;
+    const cachedSession = kioskSessionCache.get(sessionCacheKey);
+    let session: any = null;
 
-    if (!session || !session.is_active) {
-      // Cari sesi yang aktif saat ini (berjalan hari ini)
-      session = await prisma.attendance_sessions.findFirst({
-        where: {
-          organization_id: org.id,
-          is_active: true,
-          end_time: { gte: now }
-        },
-        orderBy: { start_time: 'desc' }
-      });
+    if (cachedSession && cachedSession.expiresAt > Date.now()) {
+      session = cachedSession.session;
+    } else {
+      if (sessionId && sessionId.length === 36) {
+        session = await prisma.attendance_sessions.findUnique({
+          where: { id: sessionId },
+          select: { id: true, is_active: true, late_time: true, session_type: true, checkout_start_time: true }
+        });
+      }
+
+      if (!session || !session.is_active) {
+        session = await prisma.attendance_sessions.findFirst({
+          where: {
+            organization_id: org.id,
+            is_active: true,
+            end_time: { gte: now }
+          },
+          select: { id: true, is_active: true, late_time: true, session_type: true, checkout_start_time: true },
+          orderBy: { start_time: 'desc' }
+        });
+      }
+
+      if (session) {
+        kioskSessionCache.set(sessionCacheKey, { session, expiresAt: Date.now() + 10000 });
+      }
     }
 
     if (!session) {
