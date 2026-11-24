@@ -7,6 +7,7 @@ import hpp from 'hpp'
 import dotenv from 'dotenv'
 
 dotenv.config()
+process.env.TZ = process.env.TZ || 'Asia/Jakarta'
 
 import personalRoutes from './routes/personal.routes'
 import webhookRoutes from './routes/webhook.routes'

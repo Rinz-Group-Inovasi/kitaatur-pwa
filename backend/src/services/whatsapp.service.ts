@@ -372,16 +372,20 @@ export async function startWhatsAppSession(organizationId: string) {
           for (const student of matchedGuests) {
             const cd = (student.custom_data as any) || {};
             
-            // Cek presensi hari ini
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const tomorrow = new Date(today);
-            tomorrow.setDate(tomorrow.getDate() + 1);
+            // Cek presensi hari ini (WIB / Asia/Jakarta)
+            const todayWIBStr = new Intl.DateTimeFormat('en-CA', {
+              timeZone: 'Asia/Jakarta',
+              year: 'numeric',
+              month: '2-digit',
+              day: '2-digit'
+            }).format(new Date());
+            const startOfWIBDay = new Date(`${todayWIBStr}T00:00:00.000+07:00`);
+            const endOfWIBDay = new Date(`${todayWIBStr}T23:59:59.999+07:00`);
 
             const attendanceToday = await prisma.guest_attendance.findFirst({
               where: {
                 guest_id: student.id,
-                created_at: { gte: today, lt: tomorrow }
+                created_at: { gte: startOfWIBDay, lte: endOfWIBDay }
               },
               orderBy: { created_at: 'desc' }
             });
@@ -403,9 +407,17 @@ export async function startWhatsAppSession(organizationId: string) {
             let attStatusText = 'Belum Ada Catatan Kehadiran';
             if (attendanceToday) {
               const att = attendanceToday as any;
-              const jamMasuk = new Date(att.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+              const jamMasuk = new Date(att.check_in_time).toLocaleTimeString('id-ID', {
+                timeZone: 'Asia/Jakarta',
+                hour: '2-digit',
+                minute: '2-digit'
+              });
               const jamPulang = att.check_out_time 
-                ? new Date(att.check_out_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })
+                ? new Date(att.check_out_time).toLocaleTimeString('id-ID', {
+                    timeZone: 'Asia/Jakarta',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })
                 : '-';
               attStatusText = `Hadir (Masuk: ${jamMasuk} WIB | Pulang: ${jamPulang})`;
               if (att.status === 'late') {
@@ -416,7 +428,11 @@ export async function startWhatsAppSession(organizationId: string) {
             let violationListText = 'Tidak ada catatan pelanggaran aktif. Pertahankan!';
             if (violations && violations.length > 0) {
               violationListText = violations.map((v: any, i: number) => {
-                const dateStr = new Date(v.occurred_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' });
+                const dateStr = new Date(v.occurred_at).toLocaleDateString('id-ID', {
+                  timeZone: 'Asia/Jakarta',
+                  day: 'numeric',
+                  month: 'short'
+                });
                 return `${i + 1}. [${dateStr}] *${v.title}* (+${v.points} poin) - ${v.category.toUpperCase()}`;
               }).join('\n');
             }
@@ -638,12 +654,14 @@ export async function sendAttendanceNotification(
     }
 
     const dateFormatted = time.toLocaleDateString('id-ID', {
+      timeZone: 'Asia/Jakarta',
       weekday: 'long',
       day: 'numeric',
       month: 'long',
       year: 'numeric'
     });
     const timeFormatted = time.toLocaleTimeString('id-ID', {
+      timeZone: 'Asia/Jakarta',
       hour: '2-digit',
       minute: '2-digit'
     });

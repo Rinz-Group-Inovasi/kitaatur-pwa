@@ -916,7 +916,7 @@ export const scanGuestQR = async (req: Request, res: Response) => {
 
         // 4. Jika sudah tercatat Hadir / Terlambat sebelumnya (lewat roll call manual atau scan lain)
         if (existingRecord && (existingRecord.status === 'present' || existingRecord.status === 'late')) {
-          const timeStr = existingRecord.check_in_time ? new Date(existingRecord.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+          const timeStr = existingRecord.check_in_time ? new Date(existingRecord.check_in_time).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' }) : '-';
           return res.status(200).json({
             message: `${memberName} sudah tercatat ${existingRecord.status === 'late' ? 'Terlambat' : 'Hadir'} sebelumnya (Pukul ${timeStr} WIB).`,
             data: existingRecord,
@@ -1506,7 +1506,7 @@ export async function checkIn(req: any, res: Response) {
       if (existing) {
         // 1. Jika sudah tercatat hadir atau terlambat sebelumnya
         if (existing.status === 'present' || existing.status === 'late') {
-          const timeStr = existing.check_in_time ? new Date(existing.check_in_time).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-';
+          const timeStr = existing.check_in_time ? new Date(existing.check_in_time).toLocaleTimeString('id-ID', { timeZone: 'Asia/Jakarta', hour: '2-digit', minute: '2-digit' }) : '-';
           return res.status(200).json({
             message: `Anda sudah tercatat ${existing.status === 'late' ? 'Terlambat' : 'Hadir'} sebelumnya (Pukul ${timeStr} WIB).`,
             record: existing,
