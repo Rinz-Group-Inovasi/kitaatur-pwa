@@ -566,7 +566,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
             </button>
           </div>
         )}
-        <div className="w-full flex-1 flex flex-col">
+        <div className="w-full min-w-0 flex-1 flex flex-col">
           {children}
         </div>
         {/* Spacer untuk memastikan bottom nav tidak menutupi konten paling bawah di mobile */}

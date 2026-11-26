@@ -247,7 +247,7 @@ Apa yang bisa saya bantu hari ini?`,
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col gap-6">
+    <div className="w-full min-w-0 overflow-x-hidden min-h-[calc(100dvh-7rem)] md:min-h-[calc(100vh-4rem)] p-3 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col gap-4 sm:gap-6">
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
@@ -340,9 +340,9 @@ Apa yang bisa saya bantu hari ini?`,
       </div>
 
       {/* Main Chat Interface */}
-      <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden min-h-[500px]">
+      <div className="w-full min-w-0 flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden min-h-[380px] sm:min-h-[500px]">
         {/* Chat Stream */}
-        <div className="flex-1 p-4 sm:p-6 space-y-4 overflow-y-auto max-h-[600px] bg-slate-50/40">
+        <div className="flex-1 p-3 sm:p-6 space-y-4 overflow-y-auto max-h-[55dvh] sm:max-h-[600px] bg-slate-50/40">
           {messages.map(msg => (
             <div
               key={msg.id}
@@ -424,13 +424,13 @@ Apa yang bisa saya bantu hari ini?`,
         </div>
 
         {/* Input Bar */}
-        <div className="p-4 bg-white border-t border-slate-200">
+        <div className="p-2.5 sm:p-4 bg-white border-t border-slate-200">
           <form
             onSubmit={(e) => {
               e.preventDefault()
               handleSendMessage()
             }}
-            className="flex items-end gap-2"
+            className="w-full min-w-0 flex items-end gap-1.5 sm:gap-2"
           >
             <textarea
               value={input}
@@ -441,21 +441,21 @@ Apa yang bisa saya bantu hari ini?`,
                   handleSendMessage()
                 }
               }}
-              rows={2}
-              placeholder="Tanyakan analisis keuangan pribadi, susun agenda, atau strategi tabungan..."
-              className="flex-1 max-h-36 px-4 py-2.5 text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#0087FF] focus:bg-white resize-none transition"
+              rows={1}
+              placeholder="Tanyakan analisis keuangan atau agenda..."
+              className="min-w-0 flex-1 min-h-[44px] max-h-32 px-3 sm:px-4 py-2.5 text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#0087FF] focus:bg-white resize-none transition"
             />
 
             <button
               type="submit"
               disabled={!input.trim() || loading}
-              className="h-[48px] px-5 bg-[#0087FF] hover:bg-blue-600 active:scale-95 text-white font-medium text-sm rounded-xl shadow-xs flex items-center justify-center gap-2 transition disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+              className="h-[44px] sm:h-[48px] px-3.5 sm:px-5 bg-[#0087FF] hover:bg-blue-600 active:scale-95 text-white font-medium text-sm rounded-xl shadow-xs flex items-center justify-center gap-1.5 sm:gap-2 transition disabled:opacity-40 disabled:pointer-events-none cursor-pointer shrink-0"
             >
               <Send className="w-4 h-4" />
-              <span>Kirim</span>
+              <span className="hidden sm:inline">Kirim</span>
             </button>
           </form>
-          <div className="flex items-center justify-between mt-2 px-1 text-[11px] text-slate-400">
+          <div className="hidden sm:flex items-center justify-between mt-2 px-1 text-[11px] text-slate-400">
             <span>Tekan <strong>Enter</strong> untuk mengirim, <strong>Shift+Enter</strong> untuk baris baru</span>
             <span>Personal Copilot</span>
           </div>

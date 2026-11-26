@@ -499,11 +499,11 @@ Pilih salah satu saran cepat di atas atau ketik kebutuhan Anda.`,
   }
 
   return (
-    <div className="min-h-[calc(100vh-4rem)] p-4 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col gap-5">
+    <div className="w-full min-w-0 overflow-x-hidden min-h-[calc(100dvh-7rem)] md:min-h-[calc(100vh-4rem)] p-3 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col gap-3 sm:gap-5">
       
       {/* Top Header / Breadcrumb */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-3 sm:pb-4 border-b border-slate-200 min-w-0">
+        <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
             <Link href={`/org/${orgSlug}/dashboard`} className="hover:text-slate-900 flex items-center gap-1 font-medium">
               <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
@@ -511,28 +511,28 @@ Pilih salah satu saran cepat di atas atau ketik kebutuhan Anda.`,
             <span>/</span>
             <span className="text-slate-800 font-semibold">Copilot</span>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-50 text-[#0087FF] border border-blue-100 flex items-center justify-center font-bold shadow-2xs">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-[#0087FF] border border-blue-100 flex items-center justify-center font-bold shadow-2xs shrink-0">
               <Sparkle className="w-5 h-5 text-[#0087FF]" weight="fill" />
             </div>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2">
-                KitaAtur Copilot
-                <span className="text-xs px-2.5 py-0.5 bg-blue-50 text-[#0087FF] border border-blue-200 rounded-full font-semibold">
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg sm:text-2xl font-bold text-slate-900 flex flex-wrap items-center gap-1.5 sm:gap-2">
+                <span>KitaAtur Copilot</span>
+                <span className="text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 bg-blue-50 text-[#0087FF] border border-blue-200 rounded-full font-semibold truncate max-w-[160px] sm:max-w-none">
                   {orgInfo?.name || orgSlug}
                 </span>
               </h1>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
                 Asisten operasional organisasi: susun laporan kas, rancang agenda kegiatan, dan analisis presensi.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition shadow-2xs"
+            className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 text-xs font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition shadow-2xs"
           >
             <RotateCcw className="w-3.5 h-3.5" /> Reset Obrolan
           </button>
@@ -541,11 +541,11 @@ Pilih salah satu saran cepat di atas atau ketik kebutuhan Anda.`,
 
       {/* Peringatan / Anomali Operasional (Hanya tampil jika ada anomali butuh perhatian) */}
       {earlyWarnings?.warnings && earlyWarnings.warnings.length > 0 && (
-        <div className="px-4 py-2.5 bg-amber-50/80 border border-amber-200/80 rounded-xl flex items-center justify-between gap-3 text-xs text-amber-900 shadow-2xs">
-          <div className="flex items-center gap-2 truncate">
+        <div className="w-full min-w-0 px-3 sm:px-4 py-2.5 bg-amber-50/80 border border-amber-200/80 rounded-xl flex items-center justify-between gap-2 sm:gap-3 text-xs text-amber-900 shadow-2xs">
+          <div className="flex items-center gap-2 min-w-0 flex-1">
             <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
             <span className="font-semibold truncate">{earlyWarnings.warnings[0].title}</span>
-            <span className="hidden sm:inline text-amber-700/80 text-[11px]">— {earlyWarnings.warnings[0].description}</span>
+            <span className="hidden sm:inline text-amber-700/80 text-[11px] truncate">— {earlyWarnings.warnings[0].description}</span>
           </div>
           <button
             onClick={() => handleSendMessage(earlyWarnings.warnings[0].actionPrompt)}
@@ -557,7 +557,7 @@ Pilih salah satu saran cepat di atas atau ketik kebutuhan Anda.`,
       )}
 
       {/* Quick Prompt Chips */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
+      <div className="w-full min-w-0 max-w-full flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
         <span className="text-slate-400 font-medium shrink-0">Saran Cepat:</span>
         <button
           onClick={() => handleSendMessage('Tolong buatkan draf Laporan Keuangan lengkap bulan ini berdasarkan kas yang tercatat, sertakan analisis defisit/surplus dan rekomendasi praktis.')}
@@ -590,23 +590,23 @@ Pilih salah satu saran cepat di atas atau ketik kebutuhan Anda.`,
       </div>
 
       {/* Main Chat Interface */}
-      <div className="flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden min-h-[500px]">
+      <div className="w-full min-w-0 flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden min-h-[380px] sm:min-h-[500px]">
         {/* Chat Stream */}
-        <div className="flex-1 p-4 sm:p-6 space-y-4 overflow-y-auto max-h-[600px] bg-slate-50/40">
+        <div className="flex-1 p-3 sm:p-6 space-y-4 overflow-y-auto max-h-[55dvh] sm:max-h-[600px] bg-slate-50/40">
           {messages.map(msg => (
             <div
               key={msg.id}
-              className={`flex gap-3 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+              className={`flex gap-2 sm:gap-3 min-w-0 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-lg bg-blue-50 text-[#0087FF] border border-blue-100 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
-                  <Sparkle className="w-4 h-4 text-[#0087FF]" weight="fill" />
+                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-50 text-[#0087FF] border border-blue-100 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                  <Sparkle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0087FF]" weight="fill" />
                 </div>
               )}
 
-              <div className={`max-w-[85%] sm:max-w-[80%] flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+              <div className={`min-w-0 max-w-[85%] sm:max-w-[80%] flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div
-                  className={`rounded-2xl px-4 py-3 shadow-2xs ${
+                  className={`max-w-full break-words rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-2xs ${
                     msg.role === 'user'
                       ? 'bg-[#0087FF] text-white rounded-br-none'
                       : 'bg-white text-slate-800 border border-slate-200/90 rounded-bl-none'
@@ -939,13 +939,13 @@ Pilih salah satu saran cepat di atas atau ketik kebutuhan Anda.`,
         </div>
 
         {/* Input Bar */}
-        <div className="p-4 bg-white border-t border-slate-200">
+        <div className="p-2.5 sm:p-4 bg-white border-t border-slate-200">
           <form
             onSubmit={(e) => {
               e.preventDefault()
               handleSendMessage()
             }}
-            className="flex items-end gap-2"
+            className="w-full min-w-0 flex items-end gap-1.5 sm:gap-2"
           >
             {/* Hidden File Input for Receipt OCR */}
             <input
@@ -961,7 +961,7 @@ Pilih salah satu saran cepat di atas atau ketik kebutuhan Anda.`,
               onClick={() => fileInputRef.current?.click()}
               disabled={uploadingReceipt || loading}
               title="Pindai Struk Kas"
-              className="h-[48px] px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50 shrink-0"
+              className="h-[44px] sm:h-[48px] px-2.5 sm:px-3.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium text-xs rounded-xl flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50 shrink-0"
             >
               {uploadingReceipt ? (
                 <Loader2 className="w-4 h-4 animate-spin text-[#0087FF]" />
@@ -982,21 +982,21 @@ Pilih salah satu saran cepat di atas atau ketik kebutuhan Anda.`,
                   handleSendMessage()
                 }
               }}
-              rows={2}
-              placeholder="Tanyakan sesuatu, minta setup laporan kas/presensi, atau susun agenda..."
-              className="flex-1 max-h-36 px-4 py-2.5 text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#0087FF] focus:bg-white resize-none transition"
+              rows={1}
+              placeholder="Tanyakan sesuatu atau susun agenda..."
+              className="min-w-0 flex-1 min-h-[44px] max-h-32 px-3 sm:px-4 py-2.5 text-sm text-slate-900 bg-slate-50 border border-slate-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-[#0087FF] focus:bg-white resize-none transition"
             />
 
             <button
               type="submit"
               disabled={!input.trim() || loading || uploadingReceipt}
-              className="h-[48px] px-5 bg-[#0087FF] hover:bg-blue-600 active:scale-95 text-white font-medium text-sm rounded-xl shadow-xs flex items-center justify-center gap-2 transition disabled:opacity-40 disabled:pointer-events-none cursor-pointer"
+              className="h-[44px] sm:h-[48px] px-3.5 sm:px-5 bg-[#0087FF] hover:bg-blue-600 active:scale-95 text-white font-medium text-sm rounded-xl shadow-xs flex items-center justify-center gap-1.5 sm:gap-2 transition disabled:opacity-40 disabled:pointer-events-none cursor-pointer shrink-0"
             >
               <Send className="w-4 h-4" />
-              <span>Kirim</span>
+              <span className="hidden sm:inline">Kirim</span>
             </button>
           </form>
-          <div className="flex items-center justify-between mt-2 px-1 text-[11px] text-slate-400">
+          <div className="hidden sm:flex items-center justify-between mt-2 px-1 text-[11px] text-slate-400">
             <span>Tekan <strong>Enter</strong> untuk kirim, <strong>Shift+Enter</strong> untuk baris baru</span>
             <span>KitaAtur Copilot</span>
           </div>
