@@ -18,13 +18,29 @@ async function generateWithFallback(prompt: string, history: Array<{ role: strin
   for (const modelName of MODEL_CANDIDATES) {
     try {
       const model = genAI.getGenerativeModel({ model: modelName })
-      if (history.length > 0) {
-        const chat = model.startChat({
-          history: history.map(h => ({
-            role: h.role === 'assistant' ? 'model' : 'user',
-            parts: [{ text: h.parts }]
-          }))
-        })
+
+      // Gemini startChat requires history to start with 'user' and alternate 'user' / 'model'
+      const mapped = history
+        .filter(h => h.parts && String(h.parts).trim().length > 0)
+        .map(h => ({
+          role: (h.role === 'assistant' || h.role === 'model' ? 'model' : 'user') as 'user' | 'model',
+          parts: [{ text: String(h.parts) }]
+        }))
+      while (mapped.length > 0 && mapped[0].role !== 'user') {
+        mapped.shift()
+      }
+      const sanitizedHistory: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }> = []
+      for (const item of mapped) {
+        const last = sanitizedHistory[sanitizedHistory.length - 1]
+        if (last && last.role === item.role) {
+          last.parts[0].text += `\n${item.parts[0].text}`
+        } else {
+          sanitizedHistory.push(item)
+        }
+      }
+
+      if (sanitizedHistory.length > 0) {
+        const chat = model.startChat({ history: sanitizedHistory })
         const result = await chat.sendMessage(prompt)
         return result.response.text()
       } else {
