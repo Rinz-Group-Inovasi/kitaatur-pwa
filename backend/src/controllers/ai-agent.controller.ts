@@ -142,14 +142,14 @@ export async function chatWithAgent(req: any, res: Response) {
         where: { organization_id: org.id },
         orderBy: { letter_date: 'desc' },
         take: 5
-      })
-      const letterCount = await prisma.org_letters.count({ where: { organization_id: org.id } })
+      }).catch(() => [])
+      const letterCount = await prisma.org_letters.count({ where: { organization_id: org.id } }).catch(() => 0)
 
       // Fetch inventory summary
       const inventoryItems = await prisma.org_inventory.findMany({
         where: { organization_id: org.id },
         include: { loans: { where: { status: 'borrowed' } } }
-      })
+      }).catch(() => [])
       const totalInventoryItems = inventoryItems.reduce((acc: number, item: any) => acc + item.quantity, 0)
       const totalAvailableItems = inventoryItems.reduce((acc: number, item: any) => acc + item.available_quantity, 0)
       const activeLoansCount = inventoryItems.reduce((acc: number, item: any) => acc + item.loans.length, 0)

@@ -21,7 +21,7 @@ export default function AiAgentFloatingButton() {
 
   return (
     <>
-      <div className="fixed bottom-20 sm:bottom-6 right-4 sm:right-6 z-40">
+      <div className="hidden md:block fixed bottom-6 right-6 z-40">
         <button
           onClick={() => setIsOpen(true)}
           className="w-12 h-12 sm:w-14 sm:h-14 bg-[#0087FF] hover:bg-blue-600 active:scale-95 text-white rounded-full shadow-lg shadow-blue-500/25 hover:shadow-xl hover:shadow-blue-500/40 flex items-center justify-center transition-all duration-200 cursor-pointer border border-blue-400/30"

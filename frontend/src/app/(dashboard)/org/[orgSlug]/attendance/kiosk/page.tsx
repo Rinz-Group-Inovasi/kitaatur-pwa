@@ -90,6 +90,7 @@ export default function NfcKioskPage() {
   const [manualSearching, setManualSearching] = useState(false)
   const [manualResults, setManualResults] = useState<any[]>([])
 
+  // Hardware Keypress Listener Buffer
   // Hardware Keypress Listener Buffer & Fast Processing Queue
   const bufferRef = useRef('')
   const lastKeyTimeRef = useRef(0)
@@ -135,9 +136,11 @@ export default function NfcKioskPage() {
     return () => clearInterval(interval)
   }, [fetchKioskInfo])
 
+  // 3. Proses Tap Kartu NFC (Kirim UID ke Backend)
   // 3. Proses Tap Kartu NFC (Kirim UID ke Backend dengan Antrian Responsif)
   const handleProcessCardUid = async (rawUid: string) => {
     const cleanUid = rawUid.trim()
+    if (!cleanUid || isProcessing) return
     if (!cleanUid) return
 
     // Debounce kartu yang sama persis jika di-tap berulang dalam 1.2 detik
@@ -231,7 +234,6 @@ export default function NfcKioskPage() {
     } finally {
       inFlightRef.current = false
       setIsProcessing(false)
-
       // Reset kartu notifikasi setelah 2.2 detik (responsif dan cepat)
       if (dismissTimerRef.current) clearTimeout(dismissTimerRef.current)
       dismissTimerRef.current = setTimeout(() => {

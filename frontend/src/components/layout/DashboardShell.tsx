@@ -6,10 +6,9 @@ import {
   Target, 
   House, 
   UserCircle, 
-  Plus, 
+  SquaresFour,
   Buildings, 
   QrCode, 
-  SignOut, 
   CaretRight, 
   GearSix, 
   Package, 
@@ -36,6 +35,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const pathname = usePathname()
   const store = useDashboardStore()
   const [isNavigating, setIsNavigating] = useState(false)
+  const [showMobileMenu, setShowMobileMenu] = useState(false)
 
   const currentPath = pathname
   const isPersonal = currentPath?.startsWith('/personal') || false
@@ -43,9 +43,10 @@ export default function DashboardShell({ children }: DashboardShellProps) {
   const orgMatch = currentPath?.match(/\/org\/([^\/]+)/)
   const currentOrgSlug = orgMatch ? orgMatch[1] : ''
 
-  // Reset navigation indicator when navigation to the new route completes
+  // Reset navigation indicator and mobile drawer when navigation to the new route completes
   useEffect(() => {
     setIsNavigating(false)
+    setShowMobileMenu(false)
   }, [pathname])
 
   // Safety fallback in case navigation is interrupted
@@ -266,24 +267,6 @@ export default function DashboardShell({ children }: DashboardShellProps) {
       })
   }, [currentOrgSlug, store.orgs])
 
-  let fabHref = '/personal/wallet/create'
-  let fabTitle = 'Tambah Transaksi / Dompet'
-  if (isOrg && currentOrgSlug) {
-    if (isCurrentSchool) {
-      fabHref = `/org/${currentOrgSlug}/members`
-      fabTitle = 'Undang & Kelola Anggota'
-    } else if (currentUserRole === 'bendahara') {
-      fabHref = `/org/${currentOrgSlug}/financial/dues`
-      fabTitle = 'Tagih & Kelola Uang Kas'
-    } else if (currentUserRole === 'sekretaris' || currentUserRole === 'head' || currentUserRole === 'vice_head') {
-      fabHref = `/org/${currentOrgSlug}/attendance/sessions?tab=izin`
-      fabTitle = 'Bantu Absen & Scan QR'
-    } else {
-      fabHref = `/org/${currentOrgSlug}/attendance/scan`
-      fabTitle = 'Pindai Presensi'
-    }
-  }
-
   // Simpan last active org hanya jika user memang merupakan anggota terdaftar dari organisasi tersebut
   useEffect(() => {
     if (currentOrgSlug && store.orgs.some(o => o.slug === currentOrgSlug)) {
@@ -408,8 +391,33 @@ export default function DashboardShell({ children }: DashboardShellProps) {
     ]
   }
 
-  // Same for bottom navigation
+  // Mobile dock items: 4 main shortcuts (with Settings prioritized on the right) + Center Menu & AI sheet
   const activeBottomNavItems = isOrg ? orgNavItems : personalNavItems
+  const mobileLeftItems = isOrg && currentOrgSlug
+    ? [
+        { name: 'Dashboard', href: isCurrentSchool ? `/org/${currentOrgSlug}/executive` : `/org/${currentOrgSlug}/dashboard`, icon: Buildings },
+        { name: 'Presensi', href: `/org/${currentOrgSlug}/attendance`, icon: QrCode },
+      ]
+    : [
+        { name: 'Ringkasan', href: '/personal/dashboard', icon: House },
+        { name: 'Dompet', href: '/personal/wallet', icon: Wallet },
+      ]
+
+  const mobileRightItems = isOrg && currentOrgSlug
+    ? [
+        isCurrentSchool
+          ? { name: 'Siswa', href: `/org/${currentOrgSlug}/attendance/guests`, icon: IdentificationCard }
+          : { name: 'Keuangan', href: `/org/${currentOrgSlug}/financial`, icon: Wallet },
+        { name: 'Pengaturan', href: `/org/${currentOrgSlug}/settings`, icon: GearSix },
+      ]
+    : [
+        primaryOrgSlug
+          ? { name: isPrimarySchool ? 'Sekolah' : 'Organisasi', href: isPrimarySchool ? `/org/${primaryOrgSlug}/executive` : `/org/${primaryOrgSlug}/dashboard`, icon: Buildings }
+          : { name: 'Target', href: '/personal/targets', icon: Target },
+        { name: 'Pengaturan', href: '/settings', icon: GearSix },
+      ]
+
+  const aiAssistantHref = isOrg && currentOrgSlug ? `/org/${currentOrgSlug}/assistant` : '/personal/assistant'
 
   const isKiosk = Boolean(pathname?.includes('/attendance/kiosk'))
   const noShellPaths = ['/org/create']
@@ -565,60 +573,175 @@ export default function DashboardShell({ children }: DashboardShellProps) {
         <div className="h-32 md:h-8 shrink-0 w-full" aria-hidden="true" />
       </main>
 
-      {/* 2. MOBILE BOTTOM NAVIGATION (Floating Dock) */}
-      <nav className="md:hidden fixed bottom-6 left-4 right-4 bg-white/80 backdrop-blur-xl border border-white/40 shadow-xl shadow-slate-200/50 rounded-3xl z-50">
-        <div className="flex justify-around items-center px-4 py-3">
-          {activeBottomNavItems.slice(0, 2).map((item) => {
+      {/* Mobile Center Menu & AI Sheet */}
+      {showMobileMenu && (
+        <div className="md:hidden fixed inset-0 z-40 flex flex-col justify-end">
+          <div
+            className="fixed inset-0 bg-slate-900/35 backdrop-blur-[2px] animate-in fade-in duration-150"
+            onClick={() => setShowMobileMenu(false)}
+          />
+          <div className="relative z-50 mx-3 mb-24 bg-white rounded-3xl border border-slate-200 shadow-2xl p-4 space-y-4 max-h-[70vh] overflow-y-auto animate-in slide-in-from-bottom-4 duration-200">
+            <div className="flex items-center justify-between px-1">
+              <span className="text-xs font-extrabold uppercase tracking-wider text-slate-400">
+                {isOrg ? (isCurrentSchool ? 'Menu Sekolah' : 'Menu Organisasi') : 'Menu Personal'}
+              </span>
+              <button
+                onClick={() => setShowMobileMenu(false)}
+                className="p-1.5 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                aria-label="Tutup menu"
+              >
+                <X size={16} weight="bold" />
+              </button>
+            </div>
+
+            {/* Featured AI Copilot */}
+            <Link
+              href={aiAssistantHref}
+              prefetch={true}
+              className={`flex items-center gap-3 p-3.5 rounded-2xl border transition-all active:scale-[0.99] ${
+                currentPath?.includes('/assistant')
+                  ? 'bg-[#E0F4FE] border-[#0087FF]/40 text-[#007AE6]'
+                  : 'bg-gradient-to-r from-blue-50 to-sky-50 border-blue-200/80 text-slate-800 hover:border-blue-300'
+              }`}
+            >
+              <div className="w-10 h-10 rounded-xl bg-[#0087FF] text-white flex items-center justify-center shrink-0 shadow-sm">
+                <Sparkle size={22} weight="fill" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-extrabold text-slate-900">KitaAtur AI Copilot</div>
+                <div className="text-[11px] text-slate-500 truncate">Asisten cerdas laporan, agenda & data</div>
+              </div>
+              <CaretRight size={16} weight="bold" className="text-[#0087FF] shrink-0" />
+            </Link>
+
+            {/* All Functional Menu Grid */}
+            <div className="grid grid-cols-3 gap-2">
+              {activeBottomNavItems
+                .filter((item) => !item.href.includes('/assistant'))
+                .map((item) => {
+                  const isActive = currentPath === item.href || (item.href.includes('/executive') && currentPath?.includes('/executive'))
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      prefetch={true}
+                      className={`flex flex-col items-center justify-center gap-1.5 p-3 rounded-2xl border text-center transition-all active:scale-95 ${
+                        isActive
+                          ? 'bg-[#E0F4FE]/80 border-[#0087FF]/30 text-[#007AE6]'
+                          : 'bg-slate-50/70 border-slate-100 text-slate-600 hover:bg-slate-100'
+                      }`}
+                    >
+                      <item.icon size={22} weight={isActive ? 'duotone' : 'regular'} className={isActive ? 'text-[#0087FF]' : 'text-slate-500'} />
+                      <span className="text-[11px] font-bold leading-tight line-clamp-2">{item.name}</span>
+                    </Link>
+                  )
+                })}
+            </div>
+
+            {/* Space Switcher & Family Branches */}
+            <div className="pt-2 border-t border-slate-100 space-y-2">
+              {isOrg ? (
+                <Link
+                  href="/personal/dashboard"
+                  prefetch={true}
+                  className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition"
+                >
+                  <span className="flex items-center gap-2">
+                    <House size={18} weight="duotone" className="text-slate-500" />
+                    Beralih ke Keuangan Pribadi
+                  </span>
+                  <CaretRight size={14} weight="bold" className="text-slate-400" />
+                </Link>
+              ) : primaryOrgSlug ? (
+                <Link
+                  href={isPrimarySchool ? `/org/${primaryOrgSlug}/executive` : `/org/${primaryOrgSlug}/dashboard`}
+                  prefetch={true}
+                  className="flex items-center justify-between px-3.5 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition"
+                >
+                  <span className="flex items-center gap-2">
+                    <Buildings size={18} weight="duotone" className="text-[#0087FF]" />
+                    Beralih ke {isPrimarySchool ? 'Ruang Sekolah' : 'Organisasi'}
+                  </span>
+                  <CaretRight size={14} weight="bold" className="text-slate-400" />
+                </Link>
+              ) : null}
+
+              {familyBranches.length > 1 && (
+                <div className="space-y-1 pt-1">
+                  <div className="px-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Cabang Organisasi</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {familyBranches.map((branch) => (
+                      <Link
+                        key={branch.id}
+                        href={`/org/${branch.slug}/dashboard`}
+                        className={`px-2.5 py-1.5 rounded-lg text-[11px] font-bold border transition ${
+                          branch.is_current
+                            ? 'bg-blue-50 border-blue-200 text-blue-700'
+                            : 'bg-white border-slate-200 text-slate-600'
+                        }`}
+                      >
+                        {branch.name}
+                      </Link>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. MOBILE BOTTOM NAVIGATION (Clean 5-Slot Dock: Setting Diutamakan, Menu & AI di Tengah) */}
+      <nav className="md:hidden fixed bottom-3 left-3 right-3 bg-white/95 backdrop-blur-xl border border-slate-200/80 shadow-xl shadow-slate-300/40 rounded-2xl z-50">
+        <div className="grid grid-cols-5 items-center px-1.5 py-1.5">
+          {mobileLeftItems.map((item) => {
             const isActive = currentPath === item.href || (item.href.includes('/executive') && currentPath?.includes('/executive'))
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 prefetch={true}
-                title={item.name}
-                aria-label={item.name}
-                className={`flex items-center justify-center p-2 rounded-2xl transition-all ${
-                  isActive ? 'bg-[#E0F4FE] text-[#0087FF]' : 'text-slate-400 hover:text-slate-600'
+                className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all ${
+                  isActive ? 'bg-[#E0F4FE]/80 text-[#0087FF]' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <item.icon size={24} weight={isActive ? 'duotone' : 'regular'} />
+                <item.icon size={21} weight={isActive ? 'duotone' : 'regular'} />
+                <span className="text-[10px] font-bold leading-none truncate max-w-[60px]">{item.name}</span>
               </Link>
             )
           })}
 
-          {/* Floating Action Button di Tengah */}
-          <div className="relative flex items-center justify-center -translate-y-5">
-            {currentUserRole === 'auditor' ? (
-              <div className="bg-slate-200 text-slate-400 p-4 rounded-2xl shadow-sm block cursor-not-allowed" title="Aksi tidak tersedia untuk Auditor">
-                <Plus size={24} weight="bold" />
-              </div>
-            ) : (
-              <Link 
-                href={fabHref}
-                prefetch={true}
-                title={fabTitle}
-                aria-label={fabTitle}
-                className="bg-gradient-to-tr from-[#0087FF] to-[#01C4FB] text-white p-4 rounded-2xl shadow-xl shadow-[#0087FF]/35 hover:scale-105 active:scale-95 transition-all block"
-              >
-                <Plus size={24} weight="bold" />
-              </Link>
-            )}
-          </div>
+          {/* Center Button: Menu & AI (Pengganti tombol +) */}
+          <button
+            type="button"
+            onClick={() => setShowMobileMenu((prev) => !prev)}
+            aria-label="Menu & AI Copilot"
+            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all ${
+              showMobileMenu || currentPath?.includes('/assistant')
+                ? 'bg-[#0087FF] text-white shadow-md shadow-blue-500/25'
+                : 'bg-blue-50 text-[#0087FF] hover:bg-blue-100'
+            }`}
+          >
+            <div className="flex items-center gap-0.5">
+              <Sparkle size={18} weight="fill" />
+              <SquaresFour size={18} weight="duotone" />
+            </div>
+            <span className="text-[10px] font-extrabold leading-none">AI & Menu</span>
+          </button>
 
-          {activeBottomNavItems.slice(2, 4).map((item) => {
-            const isActive = currentPath === item.href || (item.href === '/personal/dashboard' && currentPath?.startsWith('/personal'))
+          {mobileRightItems.map((item) => {
+            const isActive = currentPath === item.href || (item.href.includes('/executive') && currentPath?.includes('/executive'))
             return (
               <Link
                 key={item.name}
                 href={item.href}
                 prefetch={true}
-                title={item.name}
-                aria-label={item.name}
-                className={`flex items-center justify-center p-2 rounded-2xl transition-all ${
-                  isActive ? 'bg-[#E0F4FE] text-[#0087FF]' : 'text-slate-400 hover:text-slate-600'
+                className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all ${
+                  isActive ? 'bg-[#E0F4FE]/80 text-[#0087FF]' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <item.icon size={24} weight={isActive ? 'duotone' : 'regular'} />
+                <item.icon size={21} weight={isActive ? 'duotone' : 'regular'} />
+                <span className="text-[10px] font-bold leading-none truncate max-w-[64px]">{item.name}</span>
               </Link>
             )
           })}
