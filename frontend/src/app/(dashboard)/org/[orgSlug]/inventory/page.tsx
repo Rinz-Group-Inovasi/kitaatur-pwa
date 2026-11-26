@@ -131,6 +131,7 @@ export default function InventoryPage() {
 
   // Item Modal State
   const [isItemModalOpen, setIsItemModalOpen] = useState(false)
+  const [itemModalStep, setItemModalStep] = useState<1 | 2>(1)
   const [editingItem, setEditingItem] = useState<InventoryItem | null>(null)
   const [submittingItem, setSubmittingItem] = useState(false)
   const [itemFormData, setItemFormData] = useState({
@@ -147,6 +148,7 @@ export default function InventoryPage() {
 
   // Loan Modal State
   const [isLoanModalOpen, setIsLoanModalOpen] = useState(false)
+  const [loanModalStep, setLoanModalStep] = useState<1 | 2>(1)
   const [selectedItemForLoan, setSelectedItemForLoan] = useState<InventoryItem | null>(null)
   const [submittingLoan, setSubmittingLoan] = useState(false)
   const [loanFormData, setLoanFormData] = useState({
@@ -229,6 +231,7 @@ export default function InventoryPage() {
       notes: '',
       image_url: ''
     })
+    setItemModalStep(1)
     setIsItemModalOpen(true)
   }
 
@@ -246,6 +249,7 @@ export default function InventoryPage() {
       notes: item.notes || '',
       image_url: item.image_url || ''
     })
+    setItemModalStep(1)
     setIsItemModalOpen(true)
   }
 
@@ -305,6 +309,7 @@ export default function InventoryPage() {
       return_due_date: '',
       notes: ''
     })
+    setLoanModalStep(1)
     setIsLoanModalOpen(true)
   }
 
@@ -853,166 +858,234 @@ export default function InventoryPage() {
               </button>
             </div>
 
-            <form onSubmit={handleItemSubmit} className="mt-5 space-y-4">
-              {/* Nama Barang */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Nama Barang <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Proyektor Epson EB-X500, Speaker Portabel, dll."
-                  value={itemFormData.name}
-                  onChange={(e) => setItemFormData({ ...itemFormData, name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
+            {/* Stepper Header */}
+            <div className="mt-4 flex items-center gap-2">
+              <div className="flex-1 space-y-1">
+                <div className={`h-1.5 rounded-full transition-colors ${itemModalStep >= 1 ? 'bg-blue-600' : 'bg-slate-200'}`} />
+                <span className={`block text-[11px] font-bold ${itemModalStep === 1 ? 'text-blue-600' : 'text-slate-400'}`}>
+                  1. Info Utama
+                </span>
               </div>
-
-              {/* Kode Barang & Kategori */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Kode / ID Barang
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: AST-001 / ELK-01"
-                    value={itemFormData.item_code}
-                    onChange={(e) => setItemFormData({ ...itemFormData, item_code: e.target.value })}
-                    className="w-full px-3.5 py-2.5 font-mono text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Kategori
-                  </label>
-                  <select
-                    value={itemFormData.category}
-                    onChange={(e) => setItemFormData({ ...itemFormData, category: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  >
-                    {CATEGORIES.filter(c => c !== 'Semua').map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
+              <div className="flex-1 space-y-1">
+                <div className={`h-1.5 rounded-full transition-colors ${itemModalStep >= 2 ? 'bg-blue-600' : 'bg-slate-200'}`} />
+                <span className={`block text-[11px] font-bold ${itemModalStep === 2 ? 'text-blue-600' : 'text-slate-400'}`}>
+                  2. Lokasi & Lampiran
+                </span>
               </div>
+            </div>
 
-              {/* Jumlah & Satuan & Kondisi */}
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Jumlah <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    required
-                    value={itemFormData.quantity}
-                    onChange={(e) => setItemFormData({ ...itemFormData, quantity: parseInt(e.target.value) || 1 })}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Satuan
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="unit, buah, set..."
-                    value={itemFormData.unit}
-                    onChange={(e) => setItemFormData({ ...itemFormData, unit: e.target.value })}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Kondisi
-                  </label>
-                  <select
-                    value={itemFormData.condition}
-                    onChange={(e) => setItemFormData({ ...itemFormData, condition: e.target.value })}
-                    className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  >
-                    <option value="good">Baik</option>
-                    <option value="fair">Kurang Baik</option>
-                    <option value="damaged">Rusak</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Lokasi Penyimpanan */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Lokasi Simpan
-                </label>
-                <input
-                  type="text"
-                  placeholder="Contoh: Ruang Sekretariat - Lemari A Rak 2"
-                  value={itemFormData.location}
-                  onChange={(e) => setItemFormData({ ...itemFormData, location: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-
-              {/* Catatan / Spesifikasi */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Catatan / Spesifikasi (Opsional)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Kelengkapan kabel, serial number, atau nomor garansi..."
-                  value={itemFormData.notes}
-                  onChange={(e) => setItemFormData({ ...itemFormData, notes: e.target.value })}
-                  className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-
-              {/* Foto Barang */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Foto Fisik Barang (Opsional)
-                </label>
-                <div className="space-y-2">
-                  <input
-                    type="url"
-                    placeholder="URL gambar foto barang..."
-                    value={itemFormData.image_url}
-                    onChange={(e) => setItemFormData({ ...itemFormData, image_url: e.target.value })}
-                    className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-400">Atau unggah langsung:</span>
-                    <CustomUpload
-                      onUpload={(url) => setItemFormData(prev => ({ ...prev, image_url: url }))}
-                      label="Unggah Foto"
-                      className="inline-block"
+            <form
+              onSubmit={(e) => {
+                if (itemModalStep === 1) {
+                  e.preventDefault()
+                  if (!itemFormData.name.trim()) {
+                    toast.error('Nama barang wajib diisi')
+                    return
+                  }
+                  setItemModalStep(2)
+                  return
+                }
+                handleItemSubmit(e)
+              }}
+              className="mt-4 space-y-4"
+            >
+              {itemModalStep === 1 ? (
+                <>
+                  {/* Nama Barang */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Nama Barang <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: Proyektor Epson EB-X500, Speaker Portabel, dll."
+                      value={itemFormData.name}
+                      onChange={(e) => setItemFormData({ ...itemFormData, name: e.target.value })}
+                      className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
                   </div>
-                </div>
-              </div>
 
-              {/* Buttons */}
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsItemModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingItem}
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all disabled:opacity-50"
-                >
-                  {submittingItem ? 'Menyimpan...' : (editingItem ? 'Simpan Perubahan' : 'Tambahkan ke Inventaris')}
-                </button>
+                  {/* Kode Barang & Kategori */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Kode / ID Barang
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="Contoh: AST-001 / ELK-01"
+                        value={itemFormData.item_code}
+                        onChange={(e) => setItemFormData({ ...itemFormData, item_code: e.target.value })}
+                        className="w-full px-3.5 py-2.5 font-mono text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Kategori
+                      </label>
+                      <select
+                        value={itemFormData.category}
+                        onChange={(e) => setItemFormData({ ...itemFormData, category: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        {CATEGORIES.filter(c => c !== 'Semua').map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Jumlah & Satuan & Kondisi */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Jumlah <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={itemFormData.quantity}
+                        onChange={(e) => setItemFormData({ ...itemFormData, quantity: parseInt(e.target.value) || 1 })}
+                        className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Satuan
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="unit, buah, set..."
+                        value={itemFormData.unit}
+                        onChange={(e) => setItemFormData({ ...itemFormData, unit: e.target.value })}
+                        className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Kondisi
+                      </label>
+                      <select
+                        value={itemFormData.condition}
+                        onChange={(e) => setItemFormData({ ...itemFormData, condition: e.target.value })}
+                        className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        <option value="good">Baik</option>
+                        <option value="fair">Kurang Baik</option>
+                        <option value="damaged">Rusak</option>
+                      </select>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Lokasi Penyimpanan */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Lokasi Simpan
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Contoh: Ruang Sekretariat - Lemari A Rak 2"
+                      value={itemFormData.location}
+                      onChange={(e) => setItemFormData({ ...itemFormData, location: e.target.value })}
+                      className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+
+                  {/* Catatan / Spesifikasi */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Catatan / Spesifikasi (Opsional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Kelengkapan kabel, serial number, atau nomor garansi..."
+                      value={itemFormData.notes}
+                      onChange={(e) => setItemFormData({ ...itemFormData, notes: e.target.value })}
+                      className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+
+                  {/* Foto Barang */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Foto Fisik Barang (Opsional)
+                    </label>
+                    <div className="space-y-2">
+                      <input
+                        type="url"
+                        placeholder="URL gambar foto barang..."
+                        value={itemFormData.image_url}
+                        onChange={(e) => setItemFormData({ ...itemFormData, image_url: e.target.value })}
+                        className="w-full px-3.5 py-2 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-400">Atau unggah langsung:</span>
+                        <CustomUpload
+                          onUpload={(url) => setItemFormData(prev => ({ ...prev, image_url: url }))}
+                          label="Unggah Foto"
+                          className="inline-block"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Stepper Buttons */}
+              <div className="pt-4 flex items-center justify-between gap-3 border-t border-slate-100">
+                <span className="text-[11px] font-semibold text-slate-400">
+                  Halaman {itemModalStep} / 2
+                </span>
+                <div className="flex items-center gap-2">
+                  {itemModalStep === 1 ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setIsItemModalOpen(false)}
+                        className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!itemFormData.name.trim()) {
+                            toast.error('Nama barang wajib diisi')
+                            return
+                          }
+                          setItemModalStep(2)
+                        }}
+                        className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all"
+                      >
+                        Lanjut →
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setItemModalStep(1)}
+                        className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors"
+                      >
+                        ← Kembali
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submittingItem}
+                        className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all disabled:opacity-50"
+                      >
+                        {submittingItem ? 'Menyimpan...' : (editingItem ? 'Simpan Perubahan' : 'Tambahkan ke Inventaris')}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </form>
           </div>
@@ -1041,140 +1114,208 @@ export default function InventoryPage() {
               </button>
             </div>
 
-            <form onSubmit={handleLoanSubmit} className="mt-5 space-y-4">
-              {/* Pilih Barang */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Pilih Barang yang Dipinjam <span className="text-rose-500">*</span>
-                </label>
-                <select
-                  required
-                  value={loanFormData.inventory_id}
-                  onChange={(e) => {
-                    const selected = items.find(i => i.id === e.target.value)
-                    setSelectedItemForLoan(selected || null)
-                    setLoanFormData({ ...loanFormData, inventory_id: e.target.value })
-                  }}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                >
-                  <option value="">-- Pilih Barang --</option>
-                  {items.map(item => (
-                    <option key={item.id} value={item.id} disabled={item.available_quantity < 1}>
-                      {item.name} {item.item_code ? `(${item.item_code})` : ''} — Sisa {item.available_quantity} {item.unit}
-                    </option>
-                  ))}
-                </select>
+            {/* Stepper Header */}
+            <div className="mt-4 flex items-center gap-2">
+              <div className="flex-1 space-y-1">
+                <div className={`h-1.5 rounded-full transition-colors ${loanModalStep >= 1 ? 'bg-amber-500' : 'bg-slate-200'}`} />
+                <span className={`block text-[11px] font-bold ${loanModalStep === 1 ? 'text-amber-600' : 'text-slate-400'}`}>
+                  1. Barang & Peminjam
+                </span>
               </div>
-
-              {/* Jumlah Pinjam */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Jumlah yang Dipinjam <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max={selectedItemForLoan?.available_quantity || 1}
-                  required
-                  value={loanFormData.quantity}
-                  onChange={(e) => setLoanFormData({ ...loanFormData, quantity: parseInt(e.target.value) || 1 })}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-                {selectedItemForLoan && (
-                  <span className="text-[11px] text-slate-400 mt-1 block">
-                    Maksimal pinjam: {selectedItemForLoan.available_quantity} {selectedItemForLoan.unit}
-                  </span>
-                )}
+              <div className="flex-1 space-y-1">
+                <div className={`h-1.5 rounded-full transition-colors ${loanModalStep >= 2 ? 'bg-amber-500' : 'bg-slate-200'}`} />
+                <span className={`block text-[11px] font-bold ${loanModalStep === 2 ? 'text-amber-600' : 'text-slate-400'}`}>
+                  2. Jadwal & Keperluan
+                </span>
               </div>
+            </div>
 
-              {/* Nama Peminjam & Kontak */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Nama Peminjam <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Nama orang / panitia"
-                    value={loanFormData.borrower_name}
-                    onChange={(e) => setLoanFormData({ ...loanFormData, borrower_name: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
+            <form
+              onSubmit={(e) => {
+                if (loanModalStep === 1) {
+                  e.preventDefault()
+                  if (!loanFormData.inventory_id || !loanFormData.borrower_name.trim()) {
+                    toast.error('Barang dan nama peminjam wajib diisi')
+                    return
+                  }
+                  setLoanModalStep(2)
+                  return
+                }
+                handleLoanSubmit(e)
+              }}
+              className="mt-4 space-y-4"
+            >
+              {loanModalStep === 1 ? (
+                <>
+                  {/* Pilih Barang */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Pilih Barang yang Dipinjam <span className="text-rose-500">*</span>
+                    </label>
+                    <select
+                      required
+                      value={loanFormData.inventory_id}
+                      onChange={(e) => {
+                        const selected = items.find(i => i.id === e.target.value)
+                        setSelectedItemForLoan(selected || null)
+                        setLoanFormData({ ...loanFormData, inventory_id: e.target.value })
+                      }}
+                      className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    >
+                      <option value="">-- Pilih Barang --</option>
+                      {items.map(item => (
+                        <option key={item.id} value={item.id} disabled={item.available_quantity < 1}>
+                          {item.name} {item.item_code ? `(${item.item_code})` : ''} — Sisa {item.available_quantity} {item.unit}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Jumlah Pinjam */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Jumlah yang Dipinjam <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="1"
+                      max={selectedItemForLoan?.available_quantity || 1}
+                      required
+                      value={loanFormData.quantity}
+                      onChange={(e) => setLoanFormData({ ...loanFormData, quantity: parseInt(e.target.value) || 1 })}
+                      className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                    {selectedItemForLoan && (
+                      <span className="text-[11px] text-slate-400 mt-1 block">
+                        Maksimal pinjam: {selectedItemForLoan.available_quantity} {selectedItemForLoan.unit}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Nama Peminjam & Kontak */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Nama Peminjam <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="Nama orang / panitia"
+                        value={loanFormData.borrower_name}
+                        onChange={(e) => setLoanFormData({ ...loanFormData, borrower_name: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        No. WhatsApp / HP
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="0812xxxxxxx"
+                        value={loanFormData.borrower_contact}
+                        onChange={(e) => setLoanFormData({ ...loanFormData, borrower_contact: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Tanggal Pinjam & Estimasi Kembali */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Tanggal Pinjam
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={loanFormData.loan_date}
+                        onChange={(e) => setLoanFormData({ ...loanFormData, loan_date: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Batas Waktu Kembali
+                      </label>
+                      <input
+                        type="date"
+                        value={loanFormData.return_due_date}
+                        onChange={(e) => setLoanFormData({ ...loanFormData, return_due_date: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Catatan / Keperluan */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Keperluan Pinjam (Opsional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Contoh: Dipinjam untuk kegiatan seminar hari Sabtu..."
+                      value={loanFormData.notes}
+                      onChange={(e) => setLoanFormData({ ...loanFormData, notes: e.target.value })}
+                      className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Stepper Buttons */}
+              <div className="pt-4 flex items-center justify-between gap-3 border-t border-slate-100">
+                <span className="text-[11px] font-semibold text-slate-400">
+                  Halaman {loanModalStep} / 2
+                </span>
+                <div className="flex items-center gap-2">
+                  {loanModalStep === 1 ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setIsLoanModalOpen(false)}
+                        className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!loanFormData.inventory_id || !loanFormData.borrower_name.trim()) {
+                            toast.error('Barang dan nama peminjam wajib diisi')
+                            return
+                          }
+                          setLoanModalStep(2)
+                        }}
+                        className="px-5 py-2.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-xl shadow-sm transition-all"
+                      >
+                        Lanjut →
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setLoanModalStep(1)}
+                        className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors"
+                      >
+                        ← Kembali
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submittingLoan || !loanFormData.inventory_id}
+                        className="px-5 py-2.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-xl shadow-sm transition-all disabled:opacity-50"
+                      >
+                        {submittingLoan ? 'Mencatat...' : 'Konfirmasi Peminjaman'}
+                      </button>
+                    </>
+                  )}
                 </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    No. WhatsApp / HP
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="0812xxxxxxx"
-                    value={loanFormData.borrower_contact}
-                    onChange={(e) => setLoanFormData({ ...loanFormData, borrower_contact: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-              </div>
-
-              {/* Tanggal Pinjam & Estimasi Kembali */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Tanggal Pinjam
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={loanFormData.loan_date}
-                    onChange={(e) => setLoanFormData({ ...loanFormData, loan_date: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Batas Waktu Kembali
-                  </label>
-                  <input
-                    type="date"
-                    value={loanFormData.return_due_date}
-                    onChange={(e) => setLoanFormData({ ...loanFormData, return_due_date: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-              </div>
-
-              {/* Catatan / Keperluan */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Keperluan Pinjam (Opsional)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Contoh: Dipinjam untuk kegiatan seminar hari Sabtu..."
-                  value={loanFormData.notes}
-                  onChange={(e) => setLoanFormData({ ...loanFormData, notes: e.target.value })}
-                  className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
-
-              {/* Submit Buttons */}
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsLoanModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={submittingLoan || !loanFormData.inventory_id}
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-amber-500 hover:bg-amber-600 rounded-xl shadow-sm transition-all disabled:opacity-50"
-                >
-                  {submittingLoan ? 'Mencatat...' : 'Konfirmasi Peminjaman'}
-                </button>
               </div>
             </form>
           </div>

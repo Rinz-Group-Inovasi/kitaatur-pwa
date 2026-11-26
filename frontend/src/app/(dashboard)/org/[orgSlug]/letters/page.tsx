@@ -89,6 +89,7 @@ export default function LettersPage() {
 
   // Modal Form State
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [letterModalStep, setLetterModalStep] = useState<1 | 2>(1)
   const [editingLetter, setEditingLetter] = useState<Letter | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
@@ -159,6 +160,7 @@ export default function LettersPage() {
       description: '',
       file_url: ''
     })
+    setLetterModalStep(1)
     setIsModalOpen(true)
   }
 
@@ -178,6 +180,7 @@ export default function LettersPage() {
       description: letter.description || '',
       file_url: letter.file_url || ''
     })
+    setLetterModalStep(1)
     setIsModalOpen(true)
   }
 
@@ -576,205 +579,273 @@ export default function LettersPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="mt-5 space-y-4">
-              {/* Type Switcher */}
-              {!editingLetter && (
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Tipe Surat
-                  </label>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, letter_type: 'outgoing' })}
-                      className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                        formData.letter_type === 'outgoing'
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <ArrowUpRight size={16} weight="bold" />
-                      Surat Keluar (Diterbitkan)
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setFormData({ ...formData, letter_type: 'incoming' })}
-                      className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
-                        formData.letter_type === 'incoming'
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
-                          : 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                      }`}
-                    >
-                      <ArrowDownLeft size={16} weight="bold" />
-                      Surat Masuk (Diterima)
-                    </button>
-                  </div>
-                </div>
-              )}
+            {/* Stepper Header */}
+            <div className="mt-4 flex items-center gap-2">
+              <div className="flex-1 space-y-1">
+                <div className={`h-1.5 rounded-full transition-colors ${letterModalStep >= 1 ? 'bg-blue-600' : 'bg-slate-200'}`} />
+                <span className={`block text-[11px] font-bold ${letterModalStep === 1 ? 'text-blue-600' : 'text-slate-400'}`}>
+                  1. Identitas Surat
+                </span>
+              </div>
+              <div className="flex-1 space-y-1">
+                <div className={`h-1.5 rounded-full transition-colors ${letterModalStep >= 2 ? 'bg-blue-600' : 'bg-slate-200'}`} />
+                <span className={`block text-[11px] font-bold ${letterModalStep === 2 ? 'text-blue-600' : 'text-slate-400'}`}>
+                  2. Tanggal & Lampiran
+                </span>
+              </div>
+            </div>
 
-              {/* Nomor Surat & AI Auto-Generate */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
-                    Nomor Surat <span className="text-rose-500">*</span>
-                  </label>
-                  {formData.letter_type === 'outgoing' && (
-                    <button
-                      type="button"
-                      onClick={handleGenerateNumber}
-                      disabled={generatingNumber}
-                      className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50"
-                    >
-                      <Sparkle size={13} weight="fill" className="text-amber-500" />
-                      {generatingNumber ? 'Menghitung...' : 'AI Auto-Numbering'}
-                    </button>
+            <form
+              onSubmit={(e) => {
+                if (letterModalStep === 1) {
+                  e.preventDefault()
+                  if (!formData.letter_number.trim() || !formData.title.trim()) {
+                    toast.error('Nomor surat dan perihal/judul wajib diisi')
+                    return
+                  }
+                  setLetterModalStep(2)
+                  return
+                }
+                handleSubmit(e)
+              }}
+              className="mt-4 space-y-4"
+            >
+              {letterModalStep === 1 ? (
+                <>
+                  {/* Type Switcher */}
+                  {!editingLetter && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Tipe Surat
+                      </label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, letter_type: 'outgoing' })}
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                            formData.letter_type === 'outgoing'
+                              ? 'border-blue-500 bg-blue-50 text-blue-700'
+                              : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <ArrowUpRight size={16} weight="bold" />
+                          Surat Keluar (Diterbitkan)
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setFormData({ ...formData, letter_type: 'incoming' })}
+                          className={`p-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+                            formData.letter_type === 'incoming'
+                              ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                              : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <ArrowDownLeft size={16} weight="bold" />
+                          Surat Masuk (Diterima)
+                        </button>
+                      </div>
+                    </div>
                   )}
-                </div>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: 014/OSIS-SMAN1/UND/XI/2026"
-                  value={formData.letter_number}
-                  onChange={(e) => setFormData({ ...formData, letter_number: e.target.value })}
-                  className="w-full px-3.5 py-2.5 font-mono text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
 
-              {/* Perihal / Judul Surat */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Perihal / Judul Surat <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Contoh: Undangan Rapat Kerja Anggota Tahunan"
-                  value={formData.title}
-                  onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
+                  {/* Nomor Surat & AI Auto-Generate */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                        Nomor Surat <span className="text-rose-500">*</span>
+                      </label>
+                      {formData.letter_type === 'outgoing' && (
+                        <button
+                          type="button"
+                          onClick={handleGenerateNumber}
+                          disabled={generatingNumber}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-600 hover:text-blue-700 hover:underline disabled:opacity-50"
+                        >
+                          <Sparkle size={13} weight="fill" className="text-amber-500" />
+                          {generatingNumber ? 'Menghitung...' : 'AI Auto-Numbering'}
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Contoh: 014/OSIS-SMAN1/UND/XI/2026"
+                      value={formData.letter_number}
+                      onChange={(e) => setFormData({ ...formData, letter_number: e.target.value })}
+                      className="w-full px-3.5 py-2.5 font-mono text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                    />
+                  </div>
 
-              {/* Pengirim / Penerima & Kategori */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    {formData.letter_type === 'incoming' ? 'Pengirim (Pihak Luar)' : 'Tujuan / Penerima'}
-                  </label>
-                  <input
-                    type="text"
-                    placeholder={formData.letter_type === 'incoming' ? 'Nama instansi / orang pengirim' : 'Nama pihak penerima'}
-                    value={formData.letter_type === 'incoming' ? formData.sender : formData.recipient}
-                    onChange={(e) => {
-                      if (formData.letter_type === 'incoming') {
-                        setFormData({ ...formData, sender: e.target.value })
-                      } else {
-                        setFormData({ ...formData, recipient: e.target.value })
-                      }
-                    }}
-                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Kategori Surat
-                  </label>
-                  <select
-                    value={formData.category}
-                    onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  >
-                    {CATEGORIES.filter(c => c !== 'Semua').map(cat => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* Tanggal Surat & Tanggal Terima */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                    Tanggal Surat
-                  </label>
-                  <input
-                    type="date"
-                    value={formData.letter_date}
-                    onChange={(e) => setFormData({ ...formData, letter_date: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                </div>
-
-                {formData.letter_type === 'incoming' && (
+                  {/* Perihal / Judul Surat */}
                   <div>
                     <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                      Tanggal Diterima
+                      Perihal / Judul Surat <span className="text-rose-500">*</span>
                     </label>
                     <input
-                      type="date"
-                      value={formData.received_date}
-                      onChange={(e) => setFormData({ ...formData, received_date: e.target.value })}
+                      type="text"
+                      required
+                      placeholder="Contoh: Undangan Rapat Kerja Anggota Tahunan"
+                      value={formData.title}
+                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                       className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
                   </div>
-                )}
-              </div>
 
-              {/* Ringkasan Isi / Catatan */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  Ringkasan Isi / Catatan (Opsional)
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Catatan ringkas isi surat, tindak lanjut, atau disposisi..."
-                  value={formData.description}
-                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                />
-              </div>
+                  {/* Pengirim / Penerima & Kategori */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        {formData.letter_type === 'incoming' ? 'Pengirim (Pihak Luar)' : 'Tujuan / Penerima'}
+                      </label>
+                      <input
+                        type="text"
+                        placeholder={formData.letter_type === 'incoming' ? 'Nama instansi / orang pengirim' : 'Nama pihak penerima'}
+                        value={formData.letter_type === 'incoming' ? formData.sender : formData.recipient}
+                        onChange={(e) => {
+                          if (formData.letter_type === 'incoming') {
+                            setFormData({ ...formData, sender: e.target.value })
+                          } else {
+                            setFormData({ ...formData, recipient: e.target.value })
+                          }
+                        }}
+                        className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
 
-              {/* File Dokumen / Lampiran */}
-              <div>
-                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
-                  File Dokumen / Scan Surat (Opsional)
-                </label>
-                <div className="space-y-2">
-                  <input
-                    type="url"
-                    placeholder="Tautan URL dokumen (Google Drive, Dropbox, PDF)..."
-                    value={formData.file_url}
-                    onChange={(e) => setFormData({ ...formData, file_url: e.target.value })}
-                    className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
-                  />
-                  <div className="flex items-center gap-2">
-                    <span className="text-[11px] text-slate-400">Atau unggah foto fisik surat:</span>
-                    <CustomUpload
-                      onUpload={(url) => setFormData(prev => ({ ...prev, file_url: url }))}
-                      label="Unggah Foto Surat"
-                      className="inline-block"
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Kategori Surat
+                      </label>
+                      <select
+                        value={formData.category}
+                        onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      >
+                        {CATEGORIES.filter(c => c !== 'Semua').map(cat => (
+                          <option key={cat} value={cat}>{cat}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Tanggal Surat & Tanggal Terima */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                        Tanggal Surat
+                      </label>
+                      <input
+                        type="date"
+                        value={formData.letter_date}
+                        onChange={(e) => setFormData({ ...formData, letter_date: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                    </div>
+
+                    {formData.letter_type === 'incoming' && (
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                          Tanggal Diterima
+                        </label>
+                        <input
+                          type="date"
+                          value={formData.received_date}
+                          onChange={(e) => setFormData({ ...formData, received_date: e.target.value })}
+                          className="w-full px-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Ringkasan Isi / Catatan */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      Ringkasan Isi / Catatan (Opsional)
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder="Catatan ringkas isi surat, tindak lanjut, atau disposisi..."
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      className="w-full px-3.5 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
                     />
                   </div>
-                </div>
-              </div>
 
-              {/* Submit Buttons */}
-              <div className="pt-4 flex items-center justify-end gap-3 border-t border-slate-100">
-                <button
-                  type="button"
-                  onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all disabled:opacity-50"
-                >
-                  {submitting ? 'Menyimpan...' : (editingLetter ? 'Simpan Perubahan' : 'Arsipkan Surat')}
-                </button>
+                  {/* File Dokumen / Lampiran */}
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                      File Dokumen / Scan Surat (Opsional)
+                    </label>
+                    <div className="space-y-2">
+                      <input
+                        type="url"
+                        placeholder="Tautan URL dokumen (Google Drive, Dropbox, PDF)..."
+                        value={formData.file_url}
+                        onChange={(e) => setFormData({ ...formData, file_url: e.target.value })}
+                        className="w-full px-3.5 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                      />
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-400">Atau unggah foto fisik surat:</span>
+                        <CustomUpload
+                          onUpload={(url) => setFormData(prev => ({ ...prev, file_url: url }))}
+                          label="Unggah Foto Surat"
+                          className="inline-block"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* Stepper Buttons */}
+              <div className="pt-4 flex items-center justify-between gap-3 border-t border-slate-100">
+                <span className="text-[11px] font-semibold text-slate-400">
+                  Halaman {letterModalStep} / 2
+                </span>
+                <div className="flex items-center gap-2">
+                  {letterModalStep === 1 ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setIsModalOpen(false)}
+                        className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors"
+                      >
+                        Batal
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (!formData.letter_number.trim() || !formData.title.trim()) {
+                            toast.error('Nomor surat dan perihal/judul wajib diisi')
+                            return
+                          }
+                          setLetterModalStep(2)
+                        }}
+                        className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all"
+                      >
+                        Lanjut →
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setLetterModalStep(1)}
+                        className="px-4 py-2.5 text-xs font-semibold text-slate-600 hover:text-slate-900 rounded-xl hover:bg-slate-100 transition-colors"
+                      >
+                        ← Kembali
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={submitting}
+                        className="px-5 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition-all disabled:opacity-50"
+                      >
+                        {submitting ? 'Menyimpan...' : (editingLetter ? 'Simpan Perubahan' : 'Arsipkan Surat')}
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             </form>
           </div>
