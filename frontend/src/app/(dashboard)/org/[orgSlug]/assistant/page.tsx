@@ -499,40 +499,48 @@ Pilih salah satu saran cepat di atas atau ketik kebutuhan Anda.`,
   }
 
   return (
-    <div className="w-full min-w-0 overflow-x-hidden min-h-[calc(100dvh-7rem)] md:min-h-[calc(100vh-4rem)] p-3 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col gap-3 sm:gap-5">
+    <div className="w-full min-w-0 max-w-6xl mx-auto overflow-x-hidden h-[calc(100dvh-5.25rem)] md:h-auto md:min-h-[calc(100vh-4rem)] p-2.5 sm:p-6 lg:p-8 flex flex-col gap-2.5 sm:gap-5">
       
       {/* Top Header / Breadcrumb */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-3 sm:pb-4 border-b border-slate-200 min-w-0">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 pb-2.5 sm:pb-4 border-b border-slate-200 min-w-0 shrink-0">
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-xs text-slate-500 mb-1">
-            <Link href={`/org/${orgSlug}/dashboard`} className="hover:text-slate-900 flex items-center gap-1 font-medium">
-              <ArrowLeft className="w-3.5 h-3.5" /> Dashboard
-            </Link>
-            <span>/</span>
-            <span className="text-slate-800 font-semibold">Copilot</span>
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="flex items-center gap-1.5 text-[11px] sm:text-xs text-slate-500">
+              <Link href={`/org/${orgSlug}/dashboard`} className="hover:text-slate-900 flex items-center gap-1 font-medium">
+                <ArrowLeft className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Dashboard
+              </Link>
+              <span>/</span>
+              <span className="text-slate-800 font-semibold">Copilot</span>
+            </div>
+            <button
+              onClick={handleReset}
+              className="sm:hidden flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition shadow-2xs shrink-0"
+            >
+              <RotateCcw className="w-3 h-3" /> Reset
+            </button>
           </div>
-          <div className="flex items-start sm:items-center gap-3 min-w-0">
-            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-[#0087FF] border border-blue-100 flex items-center justify-center font-bold shadow-2xs shrink-0">
-              <Sparkle className="w-5 h-5 text-[#0087FF]" weight="fill" />
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-[#0087FF] border border-blue-100 flex items-center justify-center font-bold shadow-2xs shrink-0">
+              <Sparkle className="w-4 h-4 sm:w-5 sm:h-5 text-[#0087FF]" weight="fill" />
             </div>
             <div className="min-w-0 flex-1">
-              <h1 className="text-lg sm:text-2xl font-bold text-slate-900 flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <h1 className="text-base sm:text-2xl font-bold text-slate-900 flex flex-wrap items-center gap-1.5 sm:gap-2">
                 <span>KitaAtur Copilot</span>
-                <span className="text-[11px] sm:text-xs px-2 sm:px-2.5 py-0.5 bg-blue-50 text-[#0087FF] border border-blue-200 rounded-full font-semibold truncate max-w-[160px] sm:max-w-none">
+                <span className="text-[10px] sm:text-xs px-2 sm:px-2.5 py-0.5 bg-blue-50 text-[#0087FF] border border-blue-200 rounded-full font-semibold truncate max-w-[140px] sm:max-w-none">
                   {orgInfo?.name || orgSlug}
                 </span>
               </h1>
-              <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">
+              <p className="hidden sm:block text-xs text-slate-500 mt-0.5 leading-relaxed">
                 Asisten operasional organisasi: susun laporan kas, rancang agenda kegiatan, dan analisis presensi.
               </p>
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="hidden sm:flex items-center gap-2 shrink-0">
           <button
             onClick={handleReset}
-            className="flex items-center gap-1.5 px-3 py-1.5 sm:py-2 text-xs font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition shadow-2xs"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-xl transition shadow-2xs"
           >
             <RotateCcw className="w-3.5 h-3.5" /> Reset Obrolan
           </button>
@@ -541,72 +549,72 @@ Pilih salah satu saran cepat di atas atau ketik kebutuhan Anda.`,
 
       {/* Peringatan / Anomali Operasional (Hanya tampil jika ada anomali butuh perhatian) */}
       {earlyWarnings?.warnings && earlyWarnings.warnings.length > 0 && (
-        <div className="w-full min-w-0 px-3 sm:px-4 py-2.5 bg-amber-50/80 border border-amber-200/80 rounded-xl flex items-center justify-between gap-2 sm:gap-3 text-xs text-amber-900 shadow-2xs">
-          <div className="flex items-center gap-2 min-w-0 flex-1">
-            <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+        <div className="w-full min-w-0 px-3 py-2 bg-amber-50/80 border border-amber-200/80 rounded-xl flex items-center justify-between gap-2 text-[11px] sm:text-xs text-amber-900 shadow-2xs shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 flex-1">
+            <AlertTriangle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 shrink-0" />
             <span className="font-semibold truncate">{earlyWarnings.warnings[0].title}</span>
             <span className="hidden sm:inline text-amber-700/80 text-[11px] truncate">— {earlyWarnings.warnings[0].description}</span>
           </div>
           <button
             onClick={() => handleSendMessage(earlyWarnings.warnings[0].actionPrompt)}
-            className="px-2.5 py-1 text-xs font-semibold bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 rounded-lg transition shrink-0 shadow-2xs"
+            className="px-2 py-1 text-[11px] sm:text-xs font-semibold bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 rounded-lg transition shrink-0 shadow-2xs"
           >
-            Minta Solusi
+            Solusi
           </button>
         </div>
       )}
 
       {/* Quick Prompt Chips */}
-      <div className="w-full min-w-0 max-w-full flex items-center gap-2 overflow-x-auto pb-1 text-xs scrollbar-none">
-        <span className="text-slate-400 font-medium shrink-0">Saran Cepat:</span>
+      <div className="w-full min-w-0 max-w-full flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-0.5 text-[11px] sm:text-xs scrollbar-none shrink-0">
+        <span className="hidden sm:inline text-slate-400 font-medium shrink-0">Saran Cepat:</span>
         <button
           onClick={() => handleSendMessage('Tolong buatkan draf Laporan Keuangan lengkap bulan ini berdasarkan kas yang tercatat, sertakan analisis defisit/surplus dan rekomendasi praktis.')}
-          className="px-3 py-1.5 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-700 rounded-lg whitespace-nowrap transition shadow-2xs flex items-center gap-1.5 shrink-0"
+          className="px-2.5 py-1 sm:px-3 sm:py-1.5 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-700 rounded-lg whitespace-nowrap transition shadow-2xs flex items-center gap-1.5 shrink-0"
         >
-          <FileText className="w-3.5 h-3.5 text-[#0087FF]" />
+          <FileText className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-[#0087FF]" />
           Setup Laporan Kas
         </button>
         <button
           onClick={() => handleSendMessage('Bantu susun agenda rapat kerja dan rundown terstruktur untuk minggu ini, lengkap dengan PIC dan estimasi waktu, lalu siapkan sesi presensinya.')}
-          className="px-3 py-1.5 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-700 rounded-lg whitespace-nowrap transition shadow-2xs flex items-center gap-1.5 shrink-0"
+          className="px-2.5 py-1 sm:px-3 sm:py-1.5 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-700 rounded-lg whitespace-nowrap transition shadow-2xs flex items-center gap-1.5 shrink-0"
         >
-          <Calendar className="w-3.5 h-3.5 text-indigo-600" />
+          <Calendar className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-indigo-600" />
           Bikin Agenda Rapat
         </button>
         <button
           onClick={() => handleSendMessage('Bagaimana tingkat kedisiplinan dan kehadiran anggota dalam sesi-sesi terakhir? Siapa yang sering alpa atau rajin?')}
-          className="px-3 py-1.5 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-700 rounded-lg whitespace-nowrap transition shadow-2xs flex items-center gap-1.5 shrink-0"
+          className="px-2.5 py-1 sm:px-3 sm:py-1.5 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-700 rounded-lg whitespace-nowrap transition shadow-2xs flex items-center gap-1.5 shrink-0"
         >
-          <Users className="w-3.5 h-3.5 text-emerald-600" />
+          <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-emerald-600" />
           Analisis Kedisiplinan
         </button>
         <button
           onClick={() => handleSendMessage('Buatkan draf pengumuman siaran resmi organisasi untuk disampaikan ke seluruh anggota.')}
-          className="px-3 py-1.5 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-700 rounded-lg whitespace-nowrap transition shadow-2xs flex items-center gap-1.5 shrink-0"
+          className="px-2.5 py-1 sm:px-3 sm:py-1.5 bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50/40 text-slate-700 rounded-lg whitespace-nowrap transition shadow-2xs flex items-center gap-1.5 shrink-0"
         >
-          <Bell className="w-3.5 h-3.5 text-amber-600" />
+          <Bell className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-amber-600" />
           Draf Pengumuman Siaran
         </button>
       </div>
 
       {/* Main Chat Interface */}
-      <div className="w-full min-w-0 flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden min-h-[380px] sm:min-h-[500px]">
+      <div className="w-full min-w-0 flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden min-h-0 md:min-h-[500px]">
         {/* Chat Stream */}
-        <div className="flex-1 p-3 sm:p-6 space-y-4 overflow-y-auto max-h-[55dvh] sm:max-h-[600px] bg-slate-50/40">
+        <div className="flex-1 min-h-0 p-3 sm:p-6 space-y-3 sm:space-y-4 overflow-y-auto md:max-h-[600px] bg-slate-50/40">
           {messages.map(msg => (
             <div
               key={msg.id}
               className={`flex gap-2 sm:gap-3 min-w-0 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               {msg.role === 'assistant' && (
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-blue-50 text-[#0087FF] border border-blue-100 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
-                  <Sparkle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-[#0087FF]" weight="fill" />
+                <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-blue-50 text-[#0087FF] border border-blue-100 flex items-center justify-center shrink-0 shadow-2xs mt-0.5">
+                  <Sparkle className="w-3 h-3 sm:w-4 sm:h-4 text-[#0087FF]" weight="fill" />
                 </div>
               )}
 
-              <div className={`min-w-0 max-w-[85%] sm:max-w-[80%] flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+              <div className={`min-w-0 max-w-[88%] sm:max-w-[80%] flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                 <div
-                  className={`max-w-full break-words rounded-2xl px-3.5 py-2.5 sm:px-4 sm:py-3 shadow-2xs ${
+                  className={`max-w-full break-words rounded-2xl px-3 py-2 sm:px-4 sm:py-3 shadow-2xs ${
                     msg.role === 'user'
                       ? 'bg-[#0087FF] text-white rounded-br-none'
                       : 'bg-white text-slate-800 border border-slate-200/90 rounded-bl-none'

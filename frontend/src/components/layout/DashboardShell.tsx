@@ -539,7 +539,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
       )}
 
       {/* MAIN CONTENT AREA */}
-      <main className="flex-1 flex flex-col h-full relative overflow-y-auto w-full md:w-[calc(100%-16rem)]">
+      <main className="flex-1 min-w-0 flex flex-col h-full relative overflow-y-auto overflow-x-hidden w-full md:w-[calc(100%-16rem)]">
         {/* Announcement Banner */}
         {activeAnnouncement && (
           <div className={`px-4 py-3 relative z-50 shadow-sm flex items-start md:items-center justify-between gap-4 ${

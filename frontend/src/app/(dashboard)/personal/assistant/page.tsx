@@ -247,7 +247,7 @@ Apa yang bisa saya bantu hari ini?`,
   }
 
   return (
-    <div className="w-full min-w-0 overflow-x-hidden min-h-[calc(100dvh-7rem)] md:min-h-[calc(100vh-4rem)] p-3 sm:p-6 lg:p-8 max-w-6xl mx-auto flex flex-col gap-4 sm:gap-6">
+    <div className="w-full min-w-0 max-w-6xl mx-auto overflow-x-hidden h-[calc(100dvh-5.25rem)] md:h-auto md:min-h-[calc(100vh-4rem)] p-2.5 sm:p-6 lg:p-8 flex flex-col gap-3 sm:gap-6">
       
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-200">
@@ -340,9 +340,9 @@ Apa yang bisa saya bantu hari ini?`,
       </div>
 
       {/* Main Chat Interface */}
-      <div className="w-full min-w-0 flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden min-h-[380px] sm:min-h-[500px]">
+      <div className="w-full min-w-0 flex-1 bg-white border border-slate-200 rounded-2xl shadow-sm flex flex-col overflow-hidden min-h-0 md:min-h-[500px]">
         {/* Chat Stream */}
-        <div className="flex-1 p-3 sm:p-6 space-y-4 overflow-y-auto max-h-[55dvh] sm:max-h-[600px] bg-slate-50/40">
+        <div className="flex-1 min-h-0 p-3 sm:p-6 space-y-3 sm:space-y-4 overflow-y-auto md:max-h-[600px] bg-slate-50/40">
           {messages.map(msg => (
             <div
               key={msg.id}
