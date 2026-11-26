@@ -693,7 +693,7 @@ export default function DashboardShell({ children }: DashboardShellProps) {
 
       {/* 2. MOBILE BOTTOM NAVIGATION (Clean 5-Slot Dock: Setting Diutamakan, Menu & AI di Tengah) */}
       <nav className="md:hidden fixed bottom-3 left-3 right-3 bg-white/95 backdrop-blur-xl border border-slate-200/80 shadow-xl shadow-slate-300/40 rounded-2xl z-50">
-        <div className="grid grid-cols-5 items-center px-1.5 py-1.5">
+        <div className="grid grid-cols-5 items-center px-2 py-2">
           {mobileLeftItems.map((item) => {
             const isActive = currentPath === item.href || (item.href.includes('/executive') && currentPath?.includes('/executive'))
             return (
@@ -701,12 +701,13 @@ export default function DashboardShell({ children }: DashboardShellProps) {
                 key={item.name}
                 href={item.href}
                 prefetch={true}
-                className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all ${
+                title={item.name}
+                aria-label={item.name}
+                className={`flex items-center justify-center py-2.5 rounded-xl transition-all ${
                   isActive ? 'bg-[#E0F4FE]/80 text-[#0087FF]' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <item.icon size={21} weight={isActive ? 'duotone' : 'regular'} />
-                <span className="text-[10px] font-bold leading-none truncate max-w-[60px]">{item.name}</span>
+                <item.icon size={23} weight={isActive ? 'duotone' : 'regular'} />
               </Link>
             )
           })}
@@ -715,18 +716,18 @@ export default function DashboardShell({ children }: DashboardShellProps) {
           <button
             type="button"
             onClick={() => setShowMobileMenu((prev) => !prev)}
+            title="AI & Menu"
             aria-label="Menu & AI Copilot"
-            className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all ${
+            className={`flex items-center justify-center py-2.5 rounded-xl transition-all ${
               showMobileMenu || currentPath?.includes('/assistant')
                 ? 'bg-[#0087FF] text-white shadow-md shadow-blue-500/25'
                 : 'bg-blue-50 text-[#0087FF] hover:bg-blue-100'
             }`}
           >
-            <div className="flex items-center gap-0.5">
-              <Sparkle size={18} weight="fill" />
-              <SquaresFour size={18} weight="duotone" />
+            <div className="flex items-center gap-1">
+              <Sparkle size={20} weight="fill" />
+              <SquaresFour size={20} weight="duotone" />
             </div>
-            <span className="text-[10px] font-extrabold leading-none">AI & Menu</span>
           </button>
 
           {mobileRightItems.map((item) => {
@@ -736,12 +737,13 @@ export default function DashboardShell({ children }: DashboardShellProps) {
                 key={item.name}
                 href={item.href}
                 prefetch={true}
-                className={`flex flex-col items-center justify-center gap-0.5 py-1.5 rounded-xl transition-all ${
+                title={item.name}
+                aria-label={item.name}
+                className={`flex items-center justify-center py-2.5 rounded-xl transition-all ${
                   isActive ? 'bg-[#E0F4FE]/80 text-[#0087FF]' : 'text-slate-500 hover:text-slate-800'
                 }`}
               >
-                <item.icon size={21} weight={isActive ? 'duotone' : 'regular'} />
-                <span className="text-[10px] font-bold leading-none truncate max-w-[64px]">{item.name}</span>
+                <item.icon size={23} weight={isActive ? 'duotone' : 'regular'} />
               </Link>
             )
           })}
